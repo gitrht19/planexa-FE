@@ -36,22 +36,40 @@ function Counter({ end, suffix = '' }) {
 }
 
 // ── Particle Background ───────────────────────────────────
+// ── Particle Background ───────────────────────────────────
 function ParticleField() {
+  const [particles, setParticles] = useState([]);
+
+  useEffect(() => {
+    setParticles(
+      [...Array(24)].map((_, i) => ({
+        width: Math.random() * 3 + 1,
+        height: Math.random() * 3 + 1,
+        left: Math.random() * 100,
+        top: Math.random() * 100,
+        background: i % 3 === 0 ? '#e94560' : i % 3 === 1 ? '#4f8ef7' : '#a855f7',
+        opacity: Math.random() * 0.6 + 0.2,
+        duration: Math.random() * 8 + 6,
+        delay: Math.random() * 5,
+      }))
+    );
+  }, []);
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {[...Array(24)].map((_, i) => (
+      {particles.map((p, i) => (
         <div
           key={i}
           className="particle absolute rounded-full"
           style={{
-            width: `${Math.random() * 3 + 1}px`,
-            height: `${Math.random() * 3 + 1}px`,
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            background: i % 3 === 0 ? '#e94560' : i % 3 === 1 ? '#4f8ef7' : '#a855f7',
-            opacity: Math.random() * 0.6 + 0.2,
-            animation: `float ${Math.random() * 8 + 6}s ease-in-out infinite`,
-            animationDelay: `${Math.random() * 5}s`,
+            width: `${p.width}px`,
+            height: `${p.height}px`,
+            left: `${p.left}%`,
+            top: `${p.top}%`,
+            background: p.background,
+            opacity: p.opacity,
+            animation: `float ${p.duration}s ease-in-out infinite`,
+            animationDelay: `${p.delay}s`,
           }}
         />
       ))}
@@ -221,11 +239,10 @@ function HomeNavbar() {
         }
       `}</style>
 
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled
           ? 'bg-[#080810]/90 backdrop-blur-2xl border-b border-white/[0.06]'
           : 'bg-transparent'
-      }`}>
+        }`}>
         <div className="max-w-6xl mx-auto px-6 h-[72px] flex items-center justify-between">
 
           <Link href="/" className="font-display text-xl font-800 text-white tracking-[0.15em]">
@@ -294,9 +311,10 @@ function HeroSection() {
 
       {/* Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div style={{ animation: 'orb-pulse 6s ease-in-out infinite' }}
+        <div
           className="absolute top-[10%] right-[15%] w-[500px] h-[500px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(233,69,96,0.18) 0%, transparent 70%)', animation: 'orb-pulse 6s ease-in-out infinite' }} />
+          style={{ background: 'radial-gradient(circle, rgba(233,69,96,0.18) 0%, transparent 70%)', animation: 'orb-pulse 6s ease-in-out infinite' }}
+        />
         <div style={{ background: 'radial-gradient(circle, rgba(79,142,247,0.12) 0%, transparent 70%)', animation: 'orb-pulse 8s 2s ease-in-out infinite' }}
           className="absolute bottom-[15%] left-[10%] w-[400px] h-[400px] rounded-full" />
         <div style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 70%)', animation: 'orb-pulse 10s 1s ease-in-out infinite' }}
@@ -396,8 +414,8 @@ function HeroSection() {
               </div>
             </div>
             <div className="flex gap-1">
-              {[60,40,80,55,90,70,85,95,65,75].map((h, i) => (
-                <div key={i} className="flex-1 rounded-sm" style={{ height: `${h * 0.5}px`, background: `rgba(233,69,96,${0.3 + h/200})` }} />
+              {[60, 40, 80, 55, 90, 70, 85, 95, 65, 75].map((h, i) => (
+                <div key={i} className="flex-1 rounded-sm" style={{ height: `${h * 0.5}px`, background: `rgba(233,69,96,${0.3 + h / 200})` }} />
               ))}
             </div>
           </div>
@@ -656,11 +674,10 @@ function PricingSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-center">
           {plans.map((plan, i) => (
-            <div key={i} className={`relative rounded-3xl p-7 transition-all duration-300 ${
-              plan.highlight
+            <div key={i} className={`relative rounded-3xl p-7 transition-all duration-300 ${plan.highlight
                 ? 'bg-gradient-to-b from-[#1a0a10] to-[#0d0d1a] border-2 border-[#e94560]/60 pricing-glow md:scale-[1.04]'
                 : 'glass-card'
-            }`}>
+              }`}>
               {plan.highlight && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                   <span className="bg-[#e94560] text-white tag-chip px-5 py-2 rounded-full shadow-lg shadow-red-900/40">
@@ -686,9 +703,8 @@ function PricingSection() {
               <ul className="space-y-3 mb-7">
                 {plan.features.map(f => (
                   <li key={f} className="flex items-center gap-3 text-sm text-white/60">
-                    <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      plan.highlight ? 'bg-[#e94560]/20' : 'bg-white/10'
-                    }`}>
+                    <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${plan.highlight ? 'bg-[#e94560]/20' : 'bg-white/10'
+                      }`}>
                       <svg className={`w-2.5 h-2.5 ${plan.highlight ? 'text-[#e94560]' : 'text-white/50'}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -699,11 +715,10 @@ function PricingSection() {
                 ))}
               </ul>
 
-              <Link href={plan.href} className={`glow-btn block text-center py-3.5 rounded-xl font-semibold text-sm transition-all ${
-                plan.highlight
+              <Link href={plan.href} className={`glow-btn block text-center py-3.5 rounded-xl font-semibold text-sm transition-all ${plan.highlight
                   ? 'bg-[#e94560] text-white hover:bg-[#d63651] shadow-lg shadow-red-900/30'
                   : 'border border-white/10 text-white/70 hover:border-white/30 hover:text-white'
-              }`}>
+                }`}>
                 {plan.cta}
               </Link>
             </div>
@@ -800,7 +815,7 @@ export default function HomePage() {
   useEffect(() => {
     PublicService.getEvents({ page_size: 6, ordering: '-start_datetime' })
       .then(res => setEvents(res.results || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingEvents(false));
   }, []);
 

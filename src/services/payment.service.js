@@ -4,7 +4,6 @@ const PaymentService = {
 
   // ── Razorpay ───────────────────────────────────────────
 
-  // Create order
   createRazorpayOrder: async (bookingId) => {
     const res = await api.post('/api/payments/razorpay/create-order/', {
       booking_id: bookingId,
@@ -12,23 +11,26 @@ const PaymentService = {
     return res.data;
   },
 
-  // Verify payment
   verifyRazorpayPayment: async (data) => {
     const res = await api.post('/api/payments/razorpay/verify/', data);
     return res.data;
   },
 
-  // Open Razorpay checkout popup
-  openRazorpayCheckout: (orderData, onSuccess, onError) => {
+  openRazorpayCheckout: (orderData, userInfo = {}, onSuccess, onError) => {
     const options = {
-      key: orderData.key,
-      amount: orderData.amount,
+      key:      orderData.key,
+      amount:   orderData.amount,
       currency: orderData.currency,
       order_id: orderData.razorpay_order_id,
-      name: 'Plannexa',
+      name:     'Plannexa',
       description: 'Event Ticket Payment',
+      prefill: {
+        name:    userInfo.name    || '',
+        email:   userInfo.email   || '',
+        contact: userInfo.phone   || '',
+      },
       handler: (response) => onSuccess(response),
-      modal: { ondismiss: () => onError('Payment cancelled') },
+      modal:   { ondismiss: () => onError('Payment cancelled') },
     };
     const rzp = new window.Razorpay(options);
     rzp.on('payment.failed', (e) => onError(e.error?.description || 'Payment failed'));
@@ -42,29 +44,47 @@ const PaymentService = {
     return res.data;
   },
 
+  // Admin — UPI confirm/reject
+  confirmUpiPayment: async (paymentRef, action) => {
+    const res = await api.post(`/api/payments/upi/confirm/${paymentRef}/`, { action });
+    return res.data;
+  },
+
   // ── Refund ────────────────────────────────────────────
 
-  // User-side refund request (booking ref se)
+  // User — refund request karo
   requestRefund: async (paymentRef, reason = '') => {
     const res = await api.post(`/api/payments/refund/request/${paymentRef}/`, { reason });
     return res.data;
   },
 
-  // Admin/organizer refund initiate (payment ID se) — payments page ke liye
-  initiateRefund: async (paymentId) => {
-    const res = await api.post(`/api/payments/${paymentId}/refund/`);
+  // Admin — refund approve/reject karo
+  processRefund: async (refundRef, action) => {
+    const res = await api.post(`/api/payments/refund/process/${refundRef}/`, { action });
     return res.data;
   },
 
-  // ── Payments List (Dashboard) ─────────────────────────
+  // ── Admin Payments ────────────────────────────────────
 
-  getAllPayments: async (params = {}) => {
-    const res = await api.get('/api/payments/', { params });
+  getAdminPayments: async (params = {}) => {
+    const res = await api.get('/api/payments/admin/list/', { params });
     return res.data;
   },
 
-  getPaymentStats: async () => {
-    const res = await api.get('/api/payments/stats/');
+  getAdminStats: async () => {
+    const res = await api.get('/api/payments/admin/stats/');
+    return res.data;
+  },
+
+  // ── Organizer Payments ────────────────────────────────
+
+  getOrganizerPayments: async (params = {}) => {
+    const res = await api.get('/api/payments/organizer/list/', { params });
+    return res.data;
+  },
+
+  getOrganizerStats: async () => {
+    const res = await api.get('/api/payments/organizer/stats/');
     return res.data;
   },
 };

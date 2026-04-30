@@ -2,33 +2,34 @@ import api from '@/lib/api';
 
 const AuthService = {
 
-  // Register
   register: async (data) => {
     const res = await api.post('/api/users/register/', data);
     return res.data;
   },
 
-  // Verify OTP
   verifyOtp: async (data) => {
     const res = await api.post('/api/users/register/verify-otp/', data);
     return res.data;
   },
 
-  // Login
-login: async (data) => {
-  const res = await api.post('/api/users/login/', data);
-  alert(JSON.stringify(res.data));  // ✅ Alert band nahi hoga redirect se
-  return res.data;
-},
+  // ✅ Alert hata, 403 handle karo
+  login: async (data) => {
+    try {
+      const res = await api.post('/api/users/login/', data);
+      return { success: true, data: res.data };
+    } catch (error) {
+      if (error.response?.status === 403) {
+        return { success: false, pending: true };
+      }
+      throw error;
+    }
+  },
 
-
-  // Logout
   logout: async () => {
     const res = await api.post('/api/users/logout/');
     return res.data;
   },
 
-  // Token refresh
   refreshToken: async () => {
     const res = await api.post('/api/users/token/refresh/');
     return res.data;

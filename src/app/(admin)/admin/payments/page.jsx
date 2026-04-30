@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {
-  CreditCard, Search, Eye, X, TrendingUp,
+  CreditCard, Search, Eye, X, IndianRupee,
   ArrowUpRight, CheckCircle, XCircle, Clock,
-  RefreshCw, IndianRupee, AlertCircle, ShieldCheck,
+  RefreshCw, ShieldCheck, AlertCircle, Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import PaymentService from '@/services/payment.service';
@@ -29,25 +29,37 @@ function StatusBadge({ status }) {
   );
 }
 
-// ── Payment Detail Modal ───────────────────────────────
-function PaymentDetailModal({ payment, onClose, onRefund }) {
-  const [refunding, setRefunding] = useState(false);
-  if (!payment) return null;
+// ── Admin Payment Detail Modal ─────────────────────────
+function AdminPaymentDetailModal({ payment, onClose, onUpiAction, onRefundProcess }) {
+  const [upiLoading,    setUpiLoading]    = useState(false);
+  const [refundLoading, setRefundLoading] = useState(false);
+  const [refundRef,     setRefundRef]     = useState('');
 
+  if (!payment) return null;
   const status = payment.payment_status;
 
-  const handleRefund = async () => {
-    if (!confirm('Is payment ka refund request submit karna chahte ho?')) return;
-    setRefunding(true);
-    await onRefund(payment.payment_ref);
-    setRefunding(false);
+  const handleUpiAction = async (action) => {
+    setUpiLoading(true);
+    await onUpiAction(payment.payment_ref, action);
+    setUpiLoading(false);
+  };
+
+  const handleRefundProcess = async (action) => {
+    if (!refundRef.trim()) {
+      toast.error('Refund Ref daalo');
+      return;
+    }
+    setRefundLoading(true);
+    await onRefundProcess(refundRef.trim(), action);
+    setRefundLoading(false);
+    setRefundRef('');
   };
 
   const rows = [
     { label: 'Payment Ref',  value: payment.payment_ref || '—' },
     { label: 'Booking Ref',  value: payment.booking__booking_ref || '—' },
-    { label: 'Customer',     value: payment.user__email || payment.user__username || '—' },
-    { label: 'Event',        value: payment.booking__event__title || '—' },
+    { label: 'User Email',   value: payment.user__email || '—' },
+    { label: 'Username',     value: payment.user__username || '—' },
     { label: 'Amount',       value: formatPrice(payment.amount) },
     { label: 'Method',       value: payment.method || '—' },
     { label: 'Date',         value: formatDate(payment.created_at) },
@@ -57,6 +69,8 @@ function PaymentDetailModal({ payment, onClose, onRefund }) {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
+
+        {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div className="flex flex-col gap-1.5">
             <h3 className="font-bold text-gray-800 text-lg">Payment Detail</h3>
@@ -67,12 +81,14 @@ function PaymentDetailModal({ payment, onClose, onRefund }) {
           </button>
         </div>
 
+        {/* Amount */}
         <div className="bg-gradient-to-br from-[#1a1a2e] to-[#e94560] p-6 text-center">
           <p className="text-white/60 text-sm mb-1">Total Amount</p>
           <p className="text-4xl font-black text-white">{formatPrice(payment.amount)}</p>
-          <p className="text-white/50 text-xs mt-2 capitalize">{payment.method || 'razorpay'}</p>
+          <p className="text-white/50 text-xs mt-2 capitalize">{payment.method || '—'}</p>
         </div>
 
+        {/* Details */}
         <div className="p-5 space-y-3">
           {rows.map(row => (
             <div key={row.label} className="flex items-start justify-between gap-4">
@@ -82,26 +98,75 @@ function PaymentDetailModal({ payment, onClose, onRefund }) {
           ))}
         </div>
 
-        {status === 'success' && (
-          <div className="px-5 pb-5">
-            <button
-              onClick={handleRefund}
-              disabled={refunding}
-              className="w-full py-2.5 rounded-xl border-2 border-red-200 text-red-500 font-semibold text-sm hover:bg-red-50 transition disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {refunding
-                ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                : <><ArrowUpRight size={15} /> Refund Request Karo</>}
-            </button>
+        {/* Admin Actions */}
+        <div className="px-5 pb-5 space-y-3">
+
+          {/* UPI Confirm/Reject */}
+          {payment.method === 'upi' && status === 'pending' && (
+            <div>
+              <p className="text-xs text-gray-500 mb-2 font-medium">UPI Verification</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleUpiAction('confirm')}
+                  disabled={upiLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-green-50 text-green-700 font-semibold text-sm hover:bg-green-100 transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+                >
+                  {upiLoading
+                    ? <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                    : <><ShieldCheck size={14} /> Confirm</>}
+                </button>
+                <button
+                  onClick={() => handleUpiAction('reject')}
+                  disabled={upiLoading}
+                  className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 font-semibold text-sm hover:bg-red-100 transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+                >
+                  {upiLoading
+                    ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    : <><AlertCircle size={14} /> Reject</>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Refund Process */}
+          <div>
+            <p className="text-xs text-gray-500 mb-2 font-medium">Refund Process (Refund Ref se)</p>
+            <input
+              type="text"
+              placeholder="Refund Ref daalo..."
+              value={refundRef}
+              onChange={e => setRefundRef(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#e94560] mb-2"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleRefundProcess('approve')}
+                disabled={refundLoading}
+                className="flex-1 py-2.5 rounded-xl bg-blue-50 text-blue-700 font-semibold text-sm hover:bg-blue-100 transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {refundLoading
+                  ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  : <><CheckCircle size={14} /> Approve</>}
+              </button>
+              <button
+                onClick={() => handleRefundProcess('reject')}
+                disabled={refundLoading}
+                className="flex-1 py-2.5 rounded-xl bg-red-50 text-red-600 font-semibold text-sm hover:bg-red-100 transition disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {refundLoading
+                  ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                  : <><XCircle size={14} /> Reject</>}
+              </button>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Main Page ──────────────────────────────────────────
-export default function OrganizerPaymentsPage() {
+// ── Admin Main Page ────────────────────────────────────
+export default function AdminPaymentsPage() {
   const [payments, setPayments]         = useState([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState('');
@@ -125,8 +190,8 @@ export default function OrganizerPaymentsPage() {
       if (methodFilter) params.method = methodFilter;
 
       const [paymentsRes, statsRes] = await Promise.all([
-        PaymentService.getOrganizerPayments(params),
-        PaymentService.getOrganizerStats().catch(() => null),
+        PaymentService.getAdminPayments(params),
+        PaymentService.getAdminStats().catch(() => null),
       ]);
 
       setPayments(paymentsRes.results || []);
@@ -140,10 +205,21 @@ export default function OrganizerPaymentsPage() {
     }
   };
 
-  const handleRefund = async (paymentRef) => {
+  const handleUpiAction = async (paymentRef, action) => {
     try {
-      await PaymentService.requestRefund(paymentRef, '');
-      toast.success('Refund request submitted!');
+      await PaymentService.confirmUpiPayment(paymentRef, action);
+      toast.success(`Payment ${action}ed!`);
+      setSelectedPayment(null);
+      fetchPayments(currentPage);
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
+  const handleRefundProcess = async (refundRef, action) => {
+    try {
+      await PaymentService.processRefund(refundRef, action);
+      toast.success(`Refund ${action}d!`);
       setSelectedPayment(null);
       fetchPayments(currentPage);
     } catch (err) {
@@ -158,23 +234,23 @@ export default function OrganizerPaymentsPage() {
       p.payment_ref?.toLowerCase().includes(q) ||
       p.booking__booking_ref?.toLowerCase().includes(q) ||
       p.user__email?.toLowerCase().includes(q) ||
-      p.booking__event__title?.toLowerCase().includes(q)
+      p.user__username?.toLowerCase().includes(q)
     );
   });
 
   const statCards = [
     { label: 'Total Revenue', value: stats ? formatPrice(stats.total_revenue || 0) : '—', icon: IndianRupee, dark: true },
-    { label: 'Successful',    value: stats?.success_count ?? '—', icon: CheckCircle, bg: 'bg-green-50',  text: 'text-green-700' },
-    { label: 'Pending',       value: stats?.pending_count ?? '—', icon: Clock,        bg: 'bg-yellow-50', text: 'text-yellow-700' },
-    { label: 'Refunded',      value: stats?.refund_count  ?? '—', icon: ArrowUpRight, bg: 'bg-blue-50',   text: 'text-blue-700' },
+    { label: 'Successful',    value: stats?.success_count ?? '—', icon: CheckCircle,  bg: 'bg-green-50',  text: 'text-green-700' },
+    { label: 'Pending',       value: stats?.pending_count ?? '—', icon: Clock,         bg: 'bg-yellow-50', text: 'text-yellow-700' },
+    { label: 'Refunded',      value: stats?.refund_count  ?? '—', icon: ArrowUpRight,  bg: 'bg-blue-50',   text: 'text-blue-700' },
   ];
 
   return (
     <div className="space-y-6">
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Payments</h1>
-        <p className="text-gray-500 text-sm mt-1">Tumhare events ke ticket payments</p>
+        <h1 className="text-2xl font-bold text-gray-800">Payments — Admin</h1>
+        <p className="text-gray-500 text-sm mt-1">Platform ke saare transactions</p>
       </div>
 
       {/* Stats */}
@@ -204,7 +280,7 @@ export default function OrganizerPaymentsPage() {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Payment ref, booking ref, customer email, event..."
+              placeholder="Payment ref, booking ref, email, username..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#e94560]"
@@ -250,7 +326,7 @@ export default function OrganizerPaymentsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    {['Event', 'Customer', 'Booking Ref', 'Amount', 'Method', 'Status', 'Date', ''].map(h => (
+                    {['Payment Ref', 'User', 'Booking Ref', 'Amount', 'Method', 'Status', 'Date', ''].map(h => (
                       <th key={h} className="text-left px-5 py-4 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -259,14 +335,13 @@ export default function OrganizerPaymentsPage() {
                   {filteredPayments.map(payment => (
                     <tr key={payment.id} className="hover:bg-gray-50 transition">
                       <td className="px-5 py-4">
-                        <p className="text-sm text-gray-700 max-w-[140px] truncate font-medium">
-                          {payment.booking__event__title || '—'}
+                        <p className="text-xs font-mono text-gray-600 max-w-[130px] truncate">
+                          {payment.payment_ref || `#${payment.id}`}
                         </p>
                       </td>
                       <td className="px-5 py-4">
-                        <p className="text-xs text-gray-600 max-w-[140px] truncate">
-                          {payment.user__email || payment.user__username || '—'}
-                        </p>
+                        <p className="text-xs text-gray-700 max-w-[140px] truncate">{payment.user__email || '—'}</p>
+                        <p className="text-[10px] text-gray-400">{payment.user__username || ''}</p>
                       </td>
                       <td className="px-5 py-4">
                         <p className="text-xs font-mono text-gray-400">{payment.booking__booking_ref || '—'}</p>
@@ -321,10 +396,10 @@ export default function OrganizerPaymentsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800 truncate">
-                        {payment.booking__event__title || '—'}
-                      </p>
-                      <p className="text-xs text-gray-400 truncate">
                         {payment.user__email || payment.user__username || '—'}
+                      </p>
+                      <p className="text-xs text-gray-400 font-mono truncate">
+                        {payment.booking__booking_ref || payment.payment_ref || `#${payment.id}`}
                       </p>
                     </div>
                   </div>
@@ -361,10 +436,11 @@ export default function OrganizerPaymentsPage() {
         )}
       </div>
 
-      <PaymentDetailModal
+      <AdminPaymentDetailModal
         payment={selectedPayment}
         onClose={() => setSelectedPayment(null)}
-        onRefund={handleRefund}
+        onUpiAction={handleUpiAction}
+        onRefundProcess={handleRefundProcess}
       />
     </div>
   );
