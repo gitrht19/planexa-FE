@@ -17,14 +17,16 @@ const EventService = {
   // Create event
   createEvent: async (data) => {
     const res = await api.post('/api/events/events/', data, {
-      headers: { 'Content-Type': 'multipart/form-data' }, // banner image ke liye
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data;
   },
 
   // Update event
   updateEvent: async (id, data) => {
-    const res = await api.patch(`/api/events/events/${id}/`, data);
+    const res = await api.patch(`/api/events/events/${id}/`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data;
   },
 
