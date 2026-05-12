@@ -24,28 +24,33 @@ export function AuthProvider({ children }) {
   }, []);
 
 
-  const login = async (credentials) => {
-    const response = await AuthService.login(credentials);
+const login = async (credentials) => {
+  const response = await AuthService.login(credentials);
+  console.log('RESPONSE:', JSON.stringify(response));  // add karo
 
-    if (response.pending) {
-      setIsPending(true);
-      localStorage.setItem('plannexa_pending', 'true');
-      return { pending: true };
-    }
+  if (response.pending) {
+    setIsPending(true);
+    localStorage.setItem('plannexa_pending', 'true');
+    return { pending: true };
+  }
 
-    const userData = response?.data?.data?.user;
+const userData = response?.data?.data;
 
-    setIsPending(false);
-    localStorage.removeItem('plannexa_pending');
-    setUser(userData);
-    localStorage.setItem('plannexa_user', JSON.stringify(userData));
+  console.log('userData:', userData); // 🔍 debug
 
-    // ✅ Yeh add karo
-    document.cookie = `is_logged_in=true; path=/; max-age=${7 * 24 * 60 * 60}`;
+  if (!userData) {
+    throw new Error('User data not found in response');
+  }
 
-    return { pending: false, user: userData };
-  };
+  setIsPending(false);
+  localStorage.removeItem('plannexa_pending');
+  setUser(userData);
+  localStorage.setItem('plannexa_user', JSON.stringify(userData));
 
+document.cookie = `is_logged_in=true; path=/; max-age=${7 * 24 * 60 * 60}`;
+document.cookie = `user_role=${userData.role}; path=/; max-age=${7 * 24 * 60 * 60}`; 
+  return { pending: false, user: userData };
+};
   const logout = async () => {
     try { await AuthService.logout(); } catch (e) { }
     setUser(null);

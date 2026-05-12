@@ -38,18 +38,26 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await login(data);
+      console.log('RESULT:', JSON.stringify(result)); // paste karo output
+      console.log('ROLE CHECK:', result?.user?.role, result?.user?.is_staff);
+
+
       if (result?.pending) {
-        window.location.href = '/pending-approval';
+        router.push('/pending-approval');
         return;
       }
+
       toast.success('Welcome back! 🎉');
-      if (result?.user?.is_staff || result?.user?.role === 'admin') {
-        window.location.href = '/admin';
+
+
+      if (result?.user?.is_staff === true || result?.user?.role === 'admin') {
+        window.location.href = '/admin';  // ✅ Hard redirect — cookie set hone ka wait karta hai
       } else {
         window.location.href = '/dashboard';
       }
     } catch (error) {
       toast.error(getErrorMessage(error));
+    } finally {
       setLoading(false);
     }
   };
@@ -65,17 +73,17 @@ export default function LoginPage() {
     <div className="fixed inset-0 bg-[#0a0a0a] overflow-hidden">
       {/* Animated Gradient Orbs */}
       <div className="absolute inset-0 overflow-hidden">
-        <div 
+        <div
           className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-r from-rose-500/20 to-pink-500/20 blur-3xl animate-pulse"
-          style={{ 
+          style={{
             left: mousePosition.x * 0.02,
             top: mousePosition.y * 0.02,
             transition: 'transform 0.3s ease-out'
           }}
         />
-        <div 
+        <div
           className="absolute w-[400px] h-[400px] rounded-full bg-gradient-to-r from-purple-500/20 to-indigo-500/20 blur-3xl animate-pulse delay-1000"
-          style={{ 
+          style={{
             right: mousePosition.x * 0.01,
             bottom: mousePosition.y * 0.01,
             transition: 'transform 0.3s ease-out'
@@ -98,7 +106,7 @@ export default function LoginPage() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8 items-center">
-            
+
             {/* Left Side - Interactive Event Cards */}
             <div className="space-y-6">
               <div className="text-center lg:text-left">
@@ -137,11 +145,10 @@ export default function LoginPage() {
                       key={idx}
                       onMouseEnter={() => setActiveCard(idx)}
                       onMouseLeave={() => setActiveCard(-1)}
-                      className={`relative group p-4 rounded-2xl border transition-all duration-300 cursor-pointer ${
-                        activeCard === idx 
-                          ? `border-${event.color}-500/50 bg-${event.color}-500/10 scale-105`
-                          : 'border-white/10 bg-white/5'
-                      }`}
+                      className={`relative group p-4 rounded-2xl border transition-all duration-300 cursor-pointer ${activeCard === idx
+                        ? `border-${event.color}-500/50 bg-${event.color}-500/10 scale-105`
+                        : 'border-white/10 bg-white/5'
+                        }`}
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <div className={`w-10 h-10 rounded-xl bg-${event.color}-500/20 flex items-center justify-center group-hover:scale-110 transition`}>
@@ -183,10 +190,10 @@ export default function LoginPage() {
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500 rounded-3xl blur-xl opacity-30 animate-pulse" />
               <div className="relative bg-black/40 backdrop-blur-xl rounded-3xl border border-white/10 p-8">
-                
+
                 {/* Decorative top bar */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-transparent via-rose-500 to-transparent rounded-full" />
-                
+
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 mb-4">
                     <Heart size={12} className="text-rose-400 fill-rose-400" />
