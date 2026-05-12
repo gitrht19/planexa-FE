@@ -10,6 +10,7 @@ import EventService from '@/services/event.service';
 import SubscriptionService from '@/services/subscription.service';
 import { formatDate } from '@/lib/utils';
 import TicketService from '@/services/ticket.service';
+import BookingService from '@/services/booking.service';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -22,45 +23,106 @@ export default function DashboardPage() {
   const [recentEvents, setRecentEvents] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [weeklyRevenue, setWeeklyRevenue] = useState([1200, 3400, 2800, 4200, 5600, 4800, 6200]);
+  const [weeklyRevenue, setWeeklyRevenue] = useState([]);
+
+  // Helper function to calculate revenue from bookings
+  const calculateWeeklyRevenue = (bookings) => {
+    const today = new Date();
+    const weeklyData = new Array(7).fill(0);
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    bookings.forEach(booking => {
+      const bookingDate = new Date(booking.created_at || booking.booking_date);
+      const diffDays = Math.floor((today - bookingDate) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays >= 0 && diffDays < 7) {
+        const dayIndex = bookingDate.getDay();
+        weeklyData[dayIndex] += booking.total_amount || booking.amount || 0;
+      }
+    });
+    
+    return weeklyData;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch events
         const eventsRes = await EventService.getEvents({ page_size: 4 });
         setRecentEvents(eventsRes.results || []);
-        setStats(prev => ({
-          ...prev,
-          totalEvents: eventsRes.count || eventsRes.results?.length || 0,
-        }));
-
+        
+        // Fetch tickets
+        let totalTickets = 0;
         try {
           const ticketsRes = await TicketService.getTickets();
-          setStats(prev => ({
-            ...prev,
-            totalTickets: ticketsRes.count || ticketsRes.results?.length || 0,
-          }));
-        } catch { }
+          totalTickets = ticketsRes.count || ticketsRes.results?.length || 0;
+        } catch (error) {
+          console.error('Error fetching tickets:', error);
+        }
         
+        // Fetch bookings - try multiple possible method names
+        let bookings = [];
+        let totalBookings = 0;
+        let totalRevenue = 0;
+        
+        try {
+          // Try different possible method names
+          let bookingsRes = null;
+          
+          if (typeof BookingService.getBookings === 'function') {
+            bookingsRes = await BookingService.getBookings();
+          } else if (typeof BookingService.getMyBookings === 'function') {
+            bookingsRes = await BookingService.getMyBookings();
+          } else if (typeof BookingService.getAllBookings === 'function') {
+            bookingsRes = await BookingService.getAllBookings();
+          } else if (typeof BookingService.getUserBookings === 'function') {
+            bookingsRes = await BookingService.getUserBookings(user?.id);
+          }
+          
+          if (bookingsRes) {
+            bookings = bookingsRes.results || bookingsRes.data || (Array.isArray(bookingsRes) ? bookingsRes : []);
+            totalBookings = bookings.length;
+            totalRevenue = bookings.reduce((sum, booking) => sum + (booking.total_amount || booking.amount || 0), 0);
+          }
+        } catch (error) {
+          console.error('Error fetching bookings:', error);
+          // Continue without booking data
+        }
+        
+        // Calculate weekly revenue from bookings
+        const weeklyData = bookings.length > 0 ? calculateWeeklyRevenue(bookings) : [0, 0, 0, 0, 0, 0, 0];
+        setWeeklyRevenue(weeklyData);
+        
+        setStats({
+          totalEvents: eventsRes.count || eventsRes.results?.length || 0,
+          totalTickets: totalTickets,
+          totalBookings: totalBookings,
+          totalRevenue: totalRevenue,
+        });
+        
+        // Fetch subscription
         try {
           const subRes = await SubscriptionService.getMySubscription();
           setSubscription(subRes);
-        } catch { }
+        } catch (error) {
+          console.error('Error fetching subscription:', error);
+        }
 
       } catch (err) {
-        console.error(err);
+        console.error('Dashboard fetch error:', err);
       } finally {
         setLoading(false);
       }
     };
+    
     fetchData();
-  }, []);
+  }, [user]);
 
   const statCards = [
-    { label: 'Events', value: stats.totalEvents, icon: Calendar, color: '#e94560', bg: 'bg-rose-50' },
-    { label: 'Tickets', value: stats.totalTickets, icon: Ticket, color: '#10b981', bg: 'bg-emerald-50' },
-    { label: 'Bookings', value: stats.totalBookings || '0', icon: Users, color: '#8b5cf6', bg: 'bg-purple-50' },
-    { label: 'Revenue', value: `₹${(stats.totalRevenue || 12580).toLocaleString()}`, icon: Wallet, color: '#f59e0b', bg: 'bg-amber-50' },
+    { label: 'Events', value: stats.totalEvents, icon: Calendar, color: '#e94560', bg: 'bg-rose-50', href: '/events' },
+    { label: 'Tickets', value: stats.totalTickets, icon: Ticket, color: '#10b981', bg: 'bg-emerald-50', href: '/tickets' },
+    { label: 'Bookings', value: stats.totalBookings, icon: Users, color: '#8b5cf6', bg: 'bg-purple-50', href: '/bookings' },
+    { label: 'Revenue', value: `₹${stats.totalRevenue.toLocaleString()}`, icon: Wallet, color: '#f59e0b', bg: 'bg-amber-50', href: '/analytics' },
   ];
 
   const quickActions = [
@@ -70,11 +132,12 @@ export default function DashboardPage() {
     { label: 'Analytics', icon: ChartNoAxesCombined, href: '/analytics', color: 'amber' },
   ];
 
-  // Calculate graph stats
-  const maxRevenue = Math.max(...weeklyRevenue);
+  const maxRevenue = weeklyRevenue.length > 0 ? Math.max(...weeklyRevenue) : 0;
   const totalWeeklyRevenue = weeklyRevenue.reduce((a, b) => a + b, 0);
-  const avgRevenue = totalWeeklyRevenue / 7;
-  const revenueChange = ((weeklyRevenue[6] - weeklyRevenue[0]) / weeklyRevenue[0] * 100).toFixed(0);
+  const avgRevenue = weeklyRevenue.length > 0 ? totalWeeklyRevenue / 7 : 0;
+  const revenueChange = weeklyRevenue.length > 0 && weeklyRevenue[0] !== 0 
+    ? ((weeklyRevenue[6] - weeklyRevenue[0]) / weeklyRevenue[0] * 100).toFixed(0)
+    : 0;
 
   if (loading) {
     return (
@@ -92,7 +155,9 @@ export default function DashboardPage() {
       {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Dashboard</h1>
+          <h1 className="text-xl font-bold text-gray-800">
+            Welcome back, {user?.name?.split(' ')[0] || 'Organizer'}!
+          </h1>
           <p className="text-gray-500 text-xs mt-0.5">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
@@ -105,12 +170,12 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stats Row - Compact */}
+      {/* Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {statCards.map((card, idx) => (
           <Link
             key={idx}
-            href={`/${card.label.toLowerCase()}`}
+            href={card.href}
             className="bg-white rounded-xl p-3 border border-gray-100 hover:shadow-md transition-all hover:-translate-y-0.5 group"
           >
             <div className="flex items-center justify-between mb-2">
@@ -148,7 +213,7 @@ export default function DashboardPage() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Recent Events - Takes 2 columns */}
+        {/* Recent Events */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <div className="flex items-center gap-2">
@@ -199,51 +264,54 @@ export default function DashboardPage() {
                 <ChartNoAxesCombined size={14} className="text-emerald-500" />
                 <h3 className="font-semibold text-gray-800 text-sm">Revenue Overview</h3>
               </div>
-              <div className={`flex items-center gap-1 text-[10px] font-semibold ${revenueChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {revenueChange >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                {revenueChange >= 0 ? '+' : ''}{revenueChange}%
-              </div>
+              {weeklyRevenue.some(v => v > 0) && (
+                <div className={`flex items-center gap-1 text-[10px] font-semibold ${revenueChange >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {revenueChange >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                  {revenueChange >= 0 ? '+' : ''}{revenueChange}%
+                </div>
+              )}
             </div>
           </div>
           
           <div className="p-4">
-            {/* Graph Bars */}
-            <div className="flex items-end justify-between gap-1 h-24 mb-3">
-              {weeklyRevenue.map((value, idx) => {
-                const height = (value / maxRevenue) * 100;
-                const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                    <div 
-                      className="w-full bg-gradient-to-t from-rose-500 to-pink-500 rounded-sm transition-all duration-500 hover:scale-105 cursor-pointer"
-                      style={{ height: `${height}%`, minHeight: '4px' }}
-                    />
-                    <span className="text-[8px] text-gray-400 font-medium">{days[idx]}</span>
+            {weeklyRevenue.some(v => v > 0) ? (
+              <>
+                <div className="flex items-end justify-between gap-1 h-24 mb-3">
+                  {weeklyRevenue.map((value, idx) => {
+                    const height = maxRevenue > 0 ? (value / maxRevenue) * 100 : 0;
+                    const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                    return (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                        <div 
+                          className="w-full bg-gradient-to-t from-rose-500 to-pink-500 rounded-sm transition-all duration-500 hover:scale-105 cursor-pointer"
+                          style={{ height: `${height}%`, minHeight: '4px' }}
+                        />
+                        <span className="text-[8px] text-gray-400 font-medium">{days[idx]}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                  <div>
+                    <p className="text-[9px] text-gray-400 uppercase tracking-wider">Total (Week)</p>
+                    <p className="text-sm font-bold text-gray-800">₹{totalWeeklyRevenue.toLocaleString()}</p>
                   </div>
-                );
-              })}
-            </div>
-            
-            {/* Stats Summary */}
-            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-              <div>
-                <p className="text-[9px] text-gray-400 uppercase tracking-wider">Total (Week)</p>
-                <p className="text-sm font-bold text-gray-800">₹{totalWeeklyRevenue.toLocaleString()}</p>
+                  <div>
+                    <p className="text-[9px] text-gray-400 uppercase tracking-wider">Daily Avg</p>
+                    <p className="text-sm font-bold text-gray-800">₹{Math.round(avgRevenue).toLocaleString()}</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center h-32">
+                <div className="text-center">
+                  <ChartNoAxesCombined size={28} className="text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-400 text-xs">No revenue data yet</p>
+                  <p className="text-gray-300 text-[10px] mt-1">Revenue will appear once you get bookings</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[9px] text-gray-400 uppercase tracking-wider">Daily Avg</p>
-                <p className="text-sm font-bold text-gray-800">₹{Math.round(avgRevenue).toLocaleString()}</p>
-              </div>
-            </div>
-
-            {/* Peak Day */}
-            <div className="mt-2 p-2 bg-emerald-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] text-emerald-600 font-medium">📈 Best Day</span>
-                <span className="text-[10px] font-bold text-emerald-700">₹{maxRevenue.toLocaleString()}</span>
-              </div>
-              <p className="text-[8px] text-gray-500 mt-0.5">Sunday • Highest revenue this week</p>
-            </div>
+            )}
           </div>
 
           {/* Plan Info Footer */}
@@ -269,7 +337,13 @@ export default function DashboardPage() {
       <div className="bg-amber-50 rounded-xl p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles size={14} className="text-amber-600" />
-          <p className="text-amber-800 text-xs font-medium">🎯 Pro Tip: Create more events to grow your audience!</p>
+          <p className="text-amber-800 text-xs font-medium">
+            {stats.totalEvents === 0 
+              ? "🎯 Start by creating your first event!" 
+              : stats.totalBookings === 0 
+              ? "🎯 Share your events on social media to get bookings!" 
+              : `🎯 Great job! You've made ₹${stats.totalRevenue.toLocaleString()} from ${stats.totalBookings} bookings!`}
+          </p>
         </div>
         <Link href="/events/create" className="text-amber-600 text-[11px] font-semibold hover:underline">Create →</Link>
       </div>

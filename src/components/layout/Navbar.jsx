@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Menu, Bell, LogOut, User, Settings, ChevronDown, Sparkles } from 'lucide-react';
+import Image from 'next/image'; // ✅ ADD THIS IMPORT
+import { Menu, Bell, LogOut, User, Settings, ChevronDown } from 'lucide-react'; // ✅ REMOVE Sparkles from import
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/lib/utils';
@@ -40,6 +41,10 @@ export default function Navbar({ onMenuClick }) {
     }
   };
 
+  const handleDashboardClick = () => {
+    router.push('/dashboard');
+  };
+
   const hasUnreadNotifications = notifications.length > 0;
 
   return (
@@ -57,9 +62,19 @@ export default function Navbar({ onMenuClick }) {
           
           <div className="hidden sm:block">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-md">
-                <Sparkles size={14} className="text-white" />
-              </div>
+              {/* ✅ REPLACED: Clickable Logo Image */}
+              <button 
+                onClick={handleDashboardClick}
+                className="w-8 h-8 rounded-lg shadow-md hover:shadow-lg hover:scale-105 transition-all cursor-pointer overflow-hidden bg-white"
+              >
+                <Image 
+                  src="/logo.png" 
+                  alt="Logo" 
+                  width={82} 
+                  height={82} 
+                  className="w-full h-full object-cover"
+                />
+              </button>
               <div>
                 <p className="text-sm font-semibold text-gray-800">
                   Welcome back, {user?.username} 👋
@@ -72,7 +87,7 @@ export default function Navbar({ onMenuClick }) {
           </div>
         </div>
 
-        {/* Right Section */}
+        {/* Right Section - Keep everything else the same */}
         <div className="flex items-center gap-2">
           
           {/* Notification Bell */}
@@ -114,13 +129,12 @@ export default function Navbar({ onMenuClick }) {
             )}
           </div>
 
-          {/* User Dropdown */}
+          {/* User Dropdown - Keep as is */}
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-gray-100 transition group"
             >
-              {/* Avatar with status */}
               <div className="relative">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
                   {user?.username?.[0]?.toUpperCase()}
@@ -142,7 +156,6 @@ export default function Navbar({ onMenuClick }) {
             {/* Dropdown Menu */}
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                {/* User Info */}
                 <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
                   <p className="text-sm font-bold text-gray-800">{user?.username}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
@@ -151,7 +164,6 @@ export default function Navbar({ onMenuClick }) {
                   </span>
                 </div>
 
-                {/* Menu Items */}
                 <div className="py-1">
                   <Link
                     href="/profile"

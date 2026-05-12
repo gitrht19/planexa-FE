@@ -1,13 +1,12 @@
-// In your Sidebar component, add this effect to notify about collapse state
-
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image'; // ✅ ADDED for logo
 import {
   LayoutDashboard, Calendar, Ticket, BookOpen,
-  CreditCard, Crown, X, Zap, ChevronLeft, ChevronRight
-} from 'lucide-react';
+  CreditCard, Crown, X, ChevronLeft, ChevronRight
+} from 'lucide-react'; // ✅ removed Zap
 import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
@@ -38,8 +37,6 @@ export default function Sidebar({ isOpen, onClose }) {
     const newState = !isCollapsed;
     setIsCollapsed(newState);
     localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
-    
-    // Dispatch custom event to notify layout
     window.dispatchEvent(new Event('storage'));
   };
 
@@ -82,62 +79,44 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#e94560]/60 to-transparent" />
 
         {/* Logo / Toggle Section */}
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-4 border-b border-white/[0.06] min-h-[73px]`}>
-          {!isCollapsed && (
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#e94560] flex items-center justify-center shadow-lg shadow-red-900/40">
-                <Zap size={13} className="text-white fill-white" />
-              </div>
-              <div>
-                <p className="text-white text-sm font-bold tracking-[0.12em]">PLANNEXA</p>
-                <p className="text-[10px] text-slate-500 tracking-wide -mt-0.5">Event Platform</p>
-              </div>
-            </div>
-          )}
-          
-          {isCollapsed && (
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#e94560] to-[#c7354e] flex items-center justify-center shadow-lg shadow-red-900/40">
-              <Zap size={16} className="text-white fill-white" />
-            </div>
-          )}
+{/* Logo / Toggle Section */}
+<div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} px-3 py-4 border-b border-white/[0.06] min-h-[73px]`}>
+  {!isCollapsed ? (
+    // EXPANDED: show text only
+    <div className="flex items-center gap-2.5">
+      <div>
+        <p className="text-white text-sm font-bold tracking-[0.12em]">PLANNEXA</p>
+        <p className="text-[10px] text-slate-500 tracking-wide -mt-0.5">Event Platform</p>
+      </div>
+    </div>
+  ) : (
+    // COLLAPSED: show logo without pink background, bigger & cleaner
+    <div className="flex items-center justify-center w-full">
+      <div className="relative w-8 h-8 flex items-center justify-center">
+        
+      </div>
+    </div>
+  )}
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleCollapse}
-              className="hidden md:flex w-7 h-7 items-center justify-center rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition"
-              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-            </button>
-            
-            {!isCollapsed && (
-              <button
-                onClick={onClose}
-                className="md:hidden w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* User Card */}
-        {user && (
-          <div className={`mx-2 mt-3 mb-1 px-2 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
-            <div className="relative flex-shrink-0">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#e94560] to-[#a12040] flex items-center justify-center text-white font-bold text-sm shadow-md">
-                {user.username?.[0]?.toUpperCase()}
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#0f0f1a]" />
-            </div>
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-xs font-semibold truncate">{user.username}</p>
-                <p className="text-[10px] text-slate-500 capitalize">{user.role}</p>
-              </div>
-            )}
-          </div>
-        )}
+  <div className="flex items-center gap-2">
+    <button
+      onClick={toggleCollapse}
+      className="hidden md:flex w-7 h-7 items-center justify-center rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition"
+      title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+    >
+      {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+    </button>
+    
+    {!isCollapsed && (
+      <button
+        onClick={onClose}
+        className="md:hidden w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:text-white hover:bg-white/10 transition"
+      >
+        <X size={14} />
+      </button>
+    )}
+  </div>
+</div>
 
         {/* Nav Label */}
         {!isCollapsed && (

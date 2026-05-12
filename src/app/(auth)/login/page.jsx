@@ -38,7 +38,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await login(data);
-      console.log('RESULT:', JSON.stringify(result)); // paste karo output
+      console.log('RESULT:', JSON.stringify(result)); 
       console.log('ROLE CHECK:', result?.user?.role, result?.user?.is_staff);
 
 
