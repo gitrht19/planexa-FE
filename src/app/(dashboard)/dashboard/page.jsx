@@ -48,7 +48,8 @@ export default function DashboardPage() {
     const fetchData = async () => {
       try {
         // Fetch events
-        const eventsRes = await EventService.getEvents({ page_size: 4 });
+        const eventsRes = await EventService.getEvents({ page_size: 10 });
+        
         setRecentEvents(eventsRes.results || []);
         
         // Fetch tickets
