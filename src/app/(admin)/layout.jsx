@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, Users, Clock, Building2, LogOut, 
   ChevronLeft, ChevronRight, Menu, X, CreditCard,
-  Shield, Sparkles
+  Shield, Sparkles,LayoutGrid 
 } from 'lucide-react';
 
 const navItems = [
@@ -15,6 +15,7 @@ const navItems = [
   { href: '/admin/pending', label: 'Pending Users', icon: Clock },
   { href: '/admin/users', label: 'All Users', icon: Users },
   { href: '/admin/organizers', label: 'Organizers', icon: Building2 },
+  { href: '/admin/modules',  label: 'Modules',       icon: LayoutGrid }, 
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
 ];
 

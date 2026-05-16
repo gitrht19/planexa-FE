@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react';
 import AdminService from '@/services/admin.service';
 import toast from 'react-hot-toast';
-import { 
-  Building2, Search, Mail, Phone, Globe, 
+import {
+  Building2, Search, Mail, Phone, Globe,
   CheckCircle, XCircle, PauseCircle, RefreshCw,
   Eye, Calendar, Shield, ExternalLink, Edit,
   MapPin, Users, CalendarDays, Award, TrendingUp
 } from 'lucide-react';
 import Link from 'next/link';
+import { LayoutGrid } from 'lucide-react';
 
 export default function OrganizersPage() {
   const [organizers, setOrganizers] = useState([]);
@@ -55,13 +56,13 @@ export default function OrganizersPage() {
   };
 
   const filteredOrganizers = organizers.filter(org => {
-    const matchesSearch = 
+    const matchesSearch =
       org.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       org.customuser__email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       org.org_number?.includes(searchTerm) ||
       org.subdomain?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       org.domain?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     return matchesSearch;
   });
 
@@ -79,7 +80,7 @@ export default function OrganizersPage() {
         <div className="absolute inset-0 bg-black/10" />
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-500 rounded-full blur-3xl opacity-20 animate-pulse" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500 rounded-full blur-3xl opacity-20 animate-pulse delay-1000" />
-        
+
         <div className="relative p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
             <div>
@@ -92,9 +93,9 @@ export default function OrganizersPage() {
                 View and manage all registered event organizers
               </p>
             </div>
-            
+
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={fetchOrganizers}
                 className="bg-white/20 backdrop-blur-sm border border-white/30 px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-white/30 transition-all flex items-center gap-2"
               >
@@ -176,14 +177,13 @@ export default function OrganizersPage() {
           {filteredOrganizers.map(org => {
             const status = getStatusBadge(org);
             const StatusIcon = status.icon;
-            
+
             return (
               <div key={org.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 group overflow-hidden">
                 {/* Status Bar */}
-                <div className={`h-1 w-full ${
-                  status.label === 'Active' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-orange-500 to-red-500'
-                }`} />
-                
+                <div className={`h-1 w-full ${status.label === 'Active' ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 'bg-gradient-to-r from-orange-500 to-red-500'
+                  }`} />
+
                 <div className="p-5">
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
@@ -230,20 +230,23 @@ export default function OrganizersPage() {
 
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={() => {
-                        setSelectedOrganizer(org);
-                        setShowDetailsModal(true);
-                      }}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all"
-                    >
+                    <button onClick={() => { setSelectedOrganizer(org); setShowDetailsModal(true); }}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-all">
                       <Eye size={16} />
                       View Details
                     </button>
-                    <button
-                      onClick={() => setEditingOrganizer(org)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all"
+
+                    {/* ✅ NEW — Modules button */}
+                    <Link
+                      href={`/admin/organizers/${org.id}/modules`}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-medium hover:bg-indigo-100 transition-all"
                     >
+                      <LayoutGrid size={16} />
+                      Modules
+                    </Link>
+
+                    <button onClick={() => setEditingOrganizer(org)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all">
                       <Edit size={16} />
                       Edit
                     </button>
@@ -273,7 +276,7 @@ export default function OrganizersPage() {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6 space-y-6">
               {/* Basic Information */}
               <div>
@@ -362,13 +365,13 @@ export default function OrganizersPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
-                <button 
-                  onClick={() => setShowDetailsModal(false)} 
+                <button
+                  onClick={() => setShowDetailsModal(false)}
                   className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition"
                 >
                   Close
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     setShowDetailsModal(false);
                     setEditingOrganizer(selectedOrganizer);
@@ -401,7 +404,7 @@ export default function OrganizersPage() {
                 </button>
               </div>
             </div>
-            
+
             <form onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.target);
@@ -424,7 +427,7 @@ export default function OrganizersPage() {
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subdomain</label>
                 <input
@@ -435,7 +438,7 @@ export default function OrganizersPage() {
                   placeholder="e.g., companyname"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Custom Domain</label>
                 <input
@@ -446,7 +449,7 @@ export default function OrganizersPage() {
                   placeholder="e.g., company.com"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
                 <input
@@ -456,7 +459,7 @@ export default function OrganizersPage() {
                   className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
@@ -468,7 +471,7 @@ export default function OrganizersPage() {
                   <option value="false">Inactive</option>
                 </select>
               </div>
-              
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
