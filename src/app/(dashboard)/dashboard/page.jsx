@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Calendar, Ticket, TrendingUp, Plus, ArrowRight, Sparkles, Zap,
-  Users, Wallet, Activity, Eye, ChartNoAxesCombined, TrendingDown
+  Users, Wallet, Activity, Eye, ChartNoAxesCombined, TrendingDown,
+  ShieldOff, Mail, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import EventService from '@/services/event.service';
@@ -11,6 +12,7 @@ import SubscriptionService from '@/services/subscription.service';
 import { formatDate } from '@/lib/utils';
 import TicketService from '@/services/ticket.service';
 import BookingService from '@/services/booking.service';
+import OrganizerService from '@/services/organizer.service';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -20,39 +22,50 @@ export default function DashboardPage() {
     totalBookings: 0,
     totalRevenue: 0,
   });
-  const [recentEvents, setRecentEvents] = useState([]);
-  const [subscription, setSubscription] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [recentEvents,  setRecentEvents]  = useState([]);
+  const [subscription,  setSubscription]  = useState(null);
+  const [loading,       setLoading]       = useState(true);
   const [weeklyRevenue, setWeeklyRevenue] = useState([]);
+  const [hasModules,    setHasModules]    = useState(null); // null=checking, false=no access, true=ok
 
-  // Helper function to calculate revenue from bookings
+  // ── Step 1: Module check ────────────────────────────────────
+  useEffect(() => {
+    const checkModules = async () => {
+      try {
+        const data = await OrganizerService.getSidebarModules();
+        const list = Array.isArray(data) ? data : (data?.data ?? []);
+        const active = list.filter(m => m.is_enabled && m.module_detail?.is_active);
+        setHasModules(active.length > 0);
+      } catch {
+        setHasModules(false);
+      }
+    };
+    checkModules();
+  }, []);
+
+  // ── Step 2: Data fetch — only if modules exist ──────────────
   const calculateWeeklyRevenue = (bookings) => {
     const today = new Date();
     const weeklyData = new Array(7).fill(0);
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
     bookings.forEach(booking => {
       const bookingDate = new Date(booking.created_at || booking.booking_date);
       const diffDays = Math.floor((today - bookingDate) / (1000 * 60 * 60 * 24));
-      
       if (diffDays >= 0 && diffDays < 7) {
         const dayIndex = bookingDate.getDay();
         weeklyData[dayIndex] += booking.total_amount || booking.amount || 0;
       }
     });
-    
     return weeklyData;
   };
 
   useEffect(() => {
+    if (!hasModules) return; // false ya null dono pe skip
+
     const fetchData = async () => {
       try {
-        // Fetch events
         const eventsRes = await EventService.getEvents({ page_size: 10 });
-        
         setRecentEvents(eventsRes.results || []);
-        
-        // Fetch tickets
+
         let totalTickets = 0;
         try {
           const ticketsRes = await TicketService.getTickets();
@@ -60,16 +73,13 @@ export default function DashboardPage() {
         } catch (error) {
           console.error('Error fetching tickets:', error);
         }
-        
-        // Fetch bookings - try multiple possible method names
+
         let bookings = [];
         let totalBookings = 0;
         let totalRevenue = 0;
-        
+
         try {
-          // Try different possible method names
           let bookingsRes = null;
-          
           if (typeof BookingService.getBookings === 'function') {
             bookingsRes = await BookingService.getBookings();
           } else if (typeof BookingService.getMyBookings === 'function') {
@@ -79,29 +89,24 @@ export default function DashboardPage() {
           } else if (typeof BookingService.getUserBookings === 'function') {
             bookingsRes = await BookingService.getUserBookings(user?.id);
           }
-          
+
           if (bookingsRes) {
             bookings = bookingsRes.results || bookingsRes.data || (Array.isArray(bookingsRes) ? bookingsRes : []);
             totalBookings = bookings.length;
-            totalRevenue = bookings.reduce((sum, booking) => sum + (booking.total_amount || booking.amount || 0), 0);
+            totalRevenue = bookings.reduce((sum, b) => sum + (b.total_amount || b.amount || 0), 0);
           }
         } catch (error) {
           console.error('Error fetching bookings:', error);
-          // Continue without booking data
         }
-        
-        // Calculate weekly revenue from bookings
-        const weeklyData = bookings.length > 0 ? calculateWeeklyRevenue(bookings) : [0, 0, 0, 0, 0, 0, 0];
-        setWeeklyRevenue(weeklyData);
-        
+
+        setWeeklyRevenue(bookings.length > 0 ? calculateWeeklyRevenue(bookings) : [0, 0, 0, 0, 0, 0, 0]);
         setStats({
-          totalEvents: eventsRes.count || eventsRes.results?.length || 0,
-          totalTickets: totalTickets,
-          totalBookings: totalBookings,
-          totalRevenue: totalRevenue,
+          totalEvents:   eventsRes.count || eventsRes.results?.length || 0,
+          totalTickets,
+          totalBookings,
+          totalRevenue,
         });
-        
-        // Fetch subscription
+
         try {
           const subRes = await SubscriptionService.getMySubscription();
           setSubscription(subRes);
@@ -115,31 +120,109 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
-    
+
     fetchData();
-  }, [user]);
+  }, [user, hasModules]);
 
   const statCards = [
-    { label: 'Events', value: stats.totalEvents, icon: Calendar, color: '#e94560', bg: 'bg-rose-50', href: '/events' },
-    { label: 'Tickets', value: stats.totalTickets, icon: Ticket, color: '#10b981', bg: 'bg-emerald-50', href: '/tickets' },
-    { label: 'Bookings', value: stats.totalBookings, icon: Users, color: '#8b5cf6', bg: 'bg-purple-50', href: '/bookings' },
-    { label: 'Revenue', value: `₹${stats.totalRevenue.toLocaleString()}`, icon: Wallet, color: '#f59e0b', bg: 'bg-amber-50', href: '/analytics' },
+    { label: 'Events',   value: stats.totalEvents,                         icon: Calendar,           color: '#e94560', bg: 'bg-rose-50',    href: '/events' },
+    { label: 'Tickets',  value: stats.totalTickets,                        icon: Ticket,             color: '#10b981', bg: 'bg-emerald-50', href: '/tickets' },
+    { label: 'Bookings', value: stats.totalBookings,                       icon: Users,              color: '#8b5cf6', bg: 'bg-purple-50',  href: '/bookings' },
+    { label: 'Revenue',  value: `₹${stats.totalRevenue.toLocaleString()}`, icon: Wallet,             color: '#f59e0b', bg: 'bg-amber-50',   href: '/analytics' },
   ];
 
   const quickActions = [
-    { label: 'Create Event', icon: Plus, href: '/events/create', color: 'rose' },
-    { label: 'Manage Tickets', icon: Ticket, href: '/tickets', color: 'emerald' },
-    { label: 'View Bookings', icon: Eye, href: '/bookings', color: 'purple' },
-    { label: 'Analytics', icon: ChartNoAxesCombined, href: '/analytics', color: 'amber' },
+    { label: 'Create Event',   icon: Plus,                href: '/events/create', color: 'rose' },
+    { label: 'Manage Tickets', icon: Ticket,              href: '/tickets',       color: 'emerald' },
+    { label: 'View Bookings',  icon: Eye,                 href: '/bookings',      color: 'purple' },
+    { label: 'Analytics',      icon: ChartNoAxesCombined, href: '/analytics',     color: 'amber' },
   ];
 
-  const maxRevenue = weeklyRevenue.length > 0 ? Math.max(...weeklyRevenue) : 0;
+  const maxRevenue         = Math.max(...weeklyRevenue);
   const totalWeeklyRevenue = weeklyRevenue.reduce((a, b) => a + b, 0);
-  const avgRevenue = weeklyRevenue.length > 0 ? totalWeeklyRevenue / 7 : 0;
-  const revenueChange = weeklyRevenue.length > 0 && weeklyRevenue[0] !== 0 
+  const avgRevenue         = totalWeeklyRevenue / 7;
+  const revenueChange      = weeklyRevenue[0] !== 0
     ? ((weeklyRevenue[6] - weeklyRevenue[0]) / weeklyRevenue[0] * 100).toFixed(0)
     : 0;
 
+  // ── Loading: module check chal raha hai ─────────────────────
+  if (hasModules === null) {
+    return (
+      <div className="flex items-center justify-center h-[70vh]">
+        <div className="relative">
+          <div className="w-12 h-12 border-3 border-rose-100 border-t-rose-500 rounded-full animate-spin" />
+          <Sparkles size={14} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-rose-500" />
+        </div>
+      </div>
+    );
+  }
+
+  // ── No Modules Assigned ──────────────────────────────────────
+  if (!hasModules) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center">
+
+          {/* Icon */}
+          <div className="relative mx-auto w-24 h-24 mb-6">
+            <div className="absolute inset-0 bg-rose-500/10 rounded-full blur-xl" />
+            <div className="relative w-24 h-24 bg-gradient-to-br from-gray-900 to-gray-800 rounded-full flex items-center justify-center border border-white/10 shadow-2xl">
+              <ShieldOff size={36} className="text-rose-400" />
+            </div>
+          </div>
+
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            No Modules Assigned
+          </h2>
+          <p className="text-gray-500 text-sm leading-relaxed mb-8">
+            Your account is active but no modules have been assigned yet.
+            Please contact your administrator to get access.
+          </p>
+
+          {/* Steps */}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-left">
+            <p className="text-amber-800 text-xs font-semibold uppercase tracking-wider mb-3">
+              What to do next?
+            </p>
+            <ul className="space-y-2.5">
+              {[
+                'Contact your system administrator',
+                'Request module access for your account',
+                'Wait for admin to assign modules & refresh',
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-amber-700 text-sm">
+                  <span className="w-5 h-5 rounded-full bg-amber-200 text-amber-800 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <a
+              href="mailto:admin@plannexa.com"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-xl text-sm font-medium hover:shadow-lg transition"
+            >
+              <Mail size={15} />
+              Contact Admin
+            </a>
+            <button
+              onClick={() => window.location.reload()}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+            >
+              <RefreshCw size={15} />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Dashboard data loading ───────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[70vh]">
@@ -151,6 +234,7 @@ export default function DashboardPage() {
     );
   }
 
+  // ── Normal Dashboard ─────────────────────────────────────────
   return (
     <div className="space-y-5">
       {/* Welcome Header */}
@@ -174,11 +258,8 @@ export default function DashboardPage() {
       {/* Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {statCards.map((card, idx) => (
-          <Link
-            key={idx}
-            href={card.href}
-            className="bg-white rounded-xl p-3 border border-gray-100 hover:shadow-md transition-all hover:-translate-y-0.5 group"
-          >
+          <Link key={idx} href={card.href}
+            className="bg-white rounded-xl p-3 border border-gray-100 hover:shadow-md transition-all hover:-translate-y-0.5 group">
             <div className="flex items-center justify-between mb-2">
               <div className={`w-8 h-8 rounded-lg ${card.bg} flex items-center justify-center group-hover:scale-110 transition`}>
                 <card.icon size={14} style={{ color: card.color }} />
@@ -195,17 +276,14 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {quickActions.map((action, idx) => {
           const colors = {
-            rose: 'bg-rose-50 text-rose-600 hover:bg-rose-100',
+            rose:    'bg-rose-50 text-rose-600 hover:bg-rose-100',
             emerald: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100',
-            purple: 'bg-purple-50 text-purple-600 hover:bg-purple-100',
-            amber: 'bg-amber-50 text-amber-600 hover:bg-amber-100',
+            purple:  'bg-purple-50 text-purple-600 hover:bg-purple-100',
+            amber:   'bg-amber-50 text-amber-600 hover:bg-amber-100',
           };
           return (
-            <Link
-              key={idx}
-              href={action.href}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${colors[action.color]}`}
-            >
+            <Link key={idx} href={action.href}
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition ${colors[action.color]}`}>
               <action.icon size={12} /> {action.label}
             </Link>
           );
@@ -223,7 +301,7 @@ export default function DashboardPage() {
             </div>
             <Link href="/events" className="text-rose-500 text-[11px] font-medium hover:underline">All →</Link>
           </div>
-          
+
           {recentEvents.length === 0 ? (
             <div className="py-8 text-center">
               <Calendar size={28} className="text-gray-200 mx-auto mb-2" />
@@ -233,11 +311,8 @@ export default function DashboardPage() {
           ) : (
             <div className="divide-y divide-gray-50">
               {recentEvents.map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/events/${event.id}`}
-                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition group"
-                >
+                <Link key={event.id} href={`/events/${event.id}`}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition group">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center flex-shrink-0">
                     <Calendar size={12} className="text-white" />
                   </div>
@@ -247,7 +322,8 @@ export default function DashboardPage() {
                   </div>
                   <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium capitalize ${
                     event.status === 'published' ? 'bg-emerald-100 text-emerald-600' :
-                    event.status === 'draft' ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-600'
+                    event.status === 'draft'     ? 'bg-gray-100 text-gray-500'       :
+                                                   'bg-amber-100 text-amber-600'
                   }`}>
                     {event.status === 'published' ? 'Live' : event.status}
                   </span>
@@ -257,7 +333,7 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Revenue Graph Card */}
+        {/* Revenue Graph */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
             <div className="flex items-center justify-between">
@@ -273,17 +349,17 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          
+
           <div className="p-4">
             {weeklyRevenue.some(v => v > 0) ? (
               <>
                 <div className="flex items-end justify-between gap-1 h-24 mb-3">
                   {weeklyRevenue.map((value, idx) => {
                     const height = maxRevenue > 0 ? (value / maxRevenue) * 100 : 0;
-                    const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+                    const days   = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
                     return (
                       <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                        <div 
+                        <div
                           className="w-full bg-gradient-to-t from-rose-500 to-pink-500 rounded-sm transition-all duration-500 hover:scale-105 cursor-pointer"
                           style={{ height: `${height}%`, minHeight: '4px' }}
                         />
@@ -292,7 +368,6 @@ export default function DashboardPage() {
                     );
                   })}
                 </div>
-                
                 <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-[9px] text-gray-400 uppercase tracking-wider">Total (Week)</p>
@@ -315,7 +390,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Plan Info Footer */}
           <div className="px-4 py-2 bg-gradient-to-r from-rose-50 to-pink-50 border-t border-rose-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -334,19 +408,21 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Tips Section */}
+      {/* Tips */}
       <div className="bg-amber-50 rounded-xl p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles size={14} className="text-amber-600" />
           <p className="text-amber-800 text-xs font-medium">
-            {stats.totalEvents === 0 
-              ? "🎯 Start by creating your first event!" 
-              : stats.totalBookings === 0 
-              ? "🎯 Share your events on social media to get bookings!" 
+            {stats.totalEvents === 0
+              ? "🎯 Start by creating your first event!"
+              : stats.totalBookings === 0
+              ? "🎯 Share your events on social media to get bookings!"
               : `🎯 Great job! You've made ₹${stats.totalRevenue.toLocaleString()} from ${stats.totalBookings} bookings!`}
           </p>
         </div>
-        <Link href="/events/create" className="text-amber-600 text-[11px] font-semibold hover:underline">Create →</Link>
+        <Link href="/events/create" className="text-amber-600 text-[11px] font-semibold hover:underline">
+          Create →
+        </Link>
       </div>
     </div>
   );

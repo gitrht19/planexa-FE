@@ -30,7 +30,7 @@ const OrganizerService = {
 
   // ── Sidebar Modules (org ke liye assigned modules) ───────────
   getSidebarModules: async () => {
-    const res = await api.get('/api/organizer-modules/');
+    const res = await api.get('api/org-configuration/organizer-modules/');
     return res.data?.data || res.data;
   },
 };
