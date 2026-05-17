@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, Users, Clock, Building2, LogOut, 
   ChevronLeft, ChevronRight, Menu, X, CreditCard,
-  Shield, Sparkles,LayoutGrid 
+  Shield, Sparkles,LayoutGrid ,Crown
 } from 'lucide-react';
 
 const navItems = [
@@ -17,6 +17,8 @@ const navItems = [
   { href: '/admin/organizers', label: 'Organizers', icon: Building2 },
   { href: '/admin/modules',  label: 'Modules',       icon: LayoutGrid }, 
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
+  { href: '/admin/subscriptions',  label: 'Subscriptions', icon: Crown },
+
 ];
 
 export default function AdminLayout({ children }) {

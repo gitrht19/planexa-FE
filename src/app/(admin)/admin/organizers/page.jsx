@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { LayoutGrid } from 'lucide-react';
+import { Crown } from 'lucide-react';
 
 export default function OrganizersPage() {
   const [organizers, setOrganizers] = useState([]);
@@ -243,6 +244,12 @@ export default function OrganizersPage() {
                     >
                       <LayoutGrid size={16} />
                       Modules
+                    </Link>
+
+                    <Link href={`/admin/organizers/${org.id}/subscription`}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-amber-50 text-amber-700 rounded-xl text-sm font-medium hover:bg-amber-100 transition-all">
+                      <Crown size={16} />
+                      Plan
                     </Link>
 
                     <button onClick={() => setEditingOrganizer(org)}

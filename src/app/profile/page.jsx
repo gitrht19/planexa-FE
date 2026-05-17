@@ -11,15 +11,15 @@ import {
   Sparkles, AlertCircle, Award,
   Calendar, Star, Heart, ShieldCheck, Fingerprint,
   Layers, Zap, Camera, Activity,
-  TrendingUp, Clock, ThumbsUp, MessageCircle, Bookmark
+  TrendingUp, Clock, ThumbsUp, MessageCircle, Bookmark,
+  Trash2, Plus, Upload
 } from 'lucide-react';
 
 export default function ProfilePage() {
   const router = useRouter();
 
-  // ── State ────────────────────────────────────────────────
-  const [profile, setProfile] = useState(null);   // user profile
-  const [organizer, setOrganizer] = useState(null);   // organizer profile
+  const [profile, setProfile] = useState(null);
+  const [organizer, setOrganizer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,10 +39,16 @@ export default function ProfilePage() {
     current: false, new: false, confirm: false
   });
 
+  // Member gallery state
+  const [memberImages, setMemberImages] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [uploadingMemberImg, setUploadingMemberImg] = useState(false);
+  const memberInputRef = useRef(null);
+
   const avatarInputRef = useRef(null);
   const coverInputRef = useRef(null);
 
-  // ── Fetch user + organizer profile ───────────────────────
+  // Fetch user + organizer profile
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -69,11 +75,60 @@ export default function ProfilePage() {
     };
     fetchAll();
   }, []);
-  // page.jsx mein temporarily add karo
+
+  // Fetch member images (only if organizer)
   useEffect(() => {
-    if (organizer) console.log('organizer data:', organizer);
-  }, [organizer]);
-  // ── Save user profile (text fields) ──────────────────────
+    if (profile?.role === 'organizer') {
+      fetchMemberImages();
+    }
+  }, [profile]);
+
+  const fetchMemberImages = async () => {
+    setLoadingMembers(true);
+    try {
+      // Replace with your actual API endpoint
+      const res = await api.get('/org/member-images/');
+      setMemberImages(res.data);
+    } catch (err) {
+      console.error('Failed to fetch member images', err);
+      // Optional fallback dummy data (remove in production)
+      // setMemberImages([...]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const handleUploadMemberImage = async (file) => {
+    if (!file) return;
+    setUploadingMemberImg(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      // Optionally send a name (you can ask user or use filename)
+      formData.append('name', file.name.split('.')[0] || 'Team Member');
+      const res = await api.post('/org/member-images/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setMemberImages(prev => [res.data, ...prev]);
+      toast.success('Member image added!');
+    } catch (err) {
+      toast.error('Upload failed');
+    } finally {
+      setUploadingMemberImg(false);
+    }
+  };
+
+  const handleDeleteMemberImage = async (id) => {
+    if (!confirm('Remove this member image?')) return;
+    try {
+      await api.delete(`/org/member-images/${id}/`);
+      setMemberImages(prev => prev.filter(img => img.id !== id));
+      toast.success('Removed');
+    } catch (err) {
+      toast.error('Delete failed');
+    }
+  };
+
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
@@ -86,7 +141,6 @@ export default function ProfilePage() {
         last_name: res.data.last_name || '',
         mobile_number: res.data.mobile_number || '',
       });
-      // localStorage sync
       const stored = JSON.parse(localStorage.getItem('plannexa_user') || '{}');
       localStorage.setItem('plannexa_user', JSON.stringify({
         ...stored,
@@ -103,7 +157,6 @@ export default function ProfilePage() {
     }
   };
 
-  // ── Image upload (logo / cover_image) ────────────────────
   const handleImageUpload = async (file, field) => {
     if (!file) return;
     const setter = field === 'logo' ? setUploadingLogo : setUploadingCover;
@@ -123,7 +176,6 @@ export default function ProfilePage() {
     }
   };
 
-  // ── Change password ───────────────────────────────────────
   const handleChangePassword = async () => {
     if (pwForm.new_password !== pwForm.confirm_password) {
       toast.error('Passwords do not match!'); return;
@@ -158,7 +210,6 @@ export default function ProfilePage() {
     });
   };
 
-  // ── Loading ───────────────────────────────────────────────
   if (loading) return (
     <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
       <div className="relative">
@@ -235,16 +286,19 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* ── Hero Profile Section ── */}
+          {/* Hero Profile Section */}
           <div className="mb-6 sm:mb-8">
             <div className="relative rounded-xl sm:rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-100">
 
               {/* Cover Image */}
               <div className="h-32 sm:h-40 md:h-48 relative bg-gradient-to-r from-rose-100 via-pink-100 to-purple-100">
-
-                {/* img absolute karo taaki button uske upar rahe */}
                 {organizer?.cover_image ? (
-                  <img src={organizer.cover_image} className="absolute inset-0 w-full h-full object-cover" alt="Cover" />
+                  <img 
+                    src={organizer.cover_image} 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                    alt="Cover" 
+                    onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029'; }}
+                  />
                 ) : (
                   <img
                     src="https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2029"
@@ -253,7 +307,6 @@ export default function ProfilePage() {
                   />
                 )}
 
-                {/* Cover upload button */}
                 {isOrganizer && (
                   <>
                     <button
@@ -287,7 +340,12 @@ export default function ProfilePage() {
                     <div className="absolute -inset-1 bg-gradient-to-r from-rose-400 to-pink-400 rounded-xl sm:rounded-2xl blur opacity-75 group-hover:opacity-100 transition duration-300" />
                     <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-xl sm:rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg overflow-hidden">
                       {organizer?.logo ? (
-                        <img src={organizer.logo} className="w-full h-full object-cover" alt="Logo" />
+                        <img 
+                          src={organizer.logo} 
+                          className="w-full h-full object-cover" 
+                          alt="Logo"
+                          onError={(e) => { e.target.src = ''; e.target.onerror = null; }}
+                        />
                       ) : (
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
                           {profile?.username?.[0]?.toUpperCase() || 'U'}
@@ -534,7 +592,6 @@ export default function ProfilePage() {
                     })}
                   </div>
 
-                  {/* Organizer info — read only */}
                   {isOrganizer && organizer && (
                     <div className="mt-6 pt-6 border-t border-gray-100">
                       <h4 className="text-sm font-semibold text-gray-700 mb-3">Organizer Details</h4>
@@ -695,13 +752,89 @@ export default function ProfilePage() {
 
             </div>
           </div>
+
+          {/* ────────────── MEMBERS GALLERY CAROUSEL ────────────── */}
+          {(isOrganizer || memberImages.length > 0) && (
+            <div className="mt-8 sm:mt-10">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <UsersIcon size={18} className="text-rose-500" />
+                    Members Gallery
+                  </h3>
+                  {isOrganizer && (
+                    <button
+                      onClick={() => memberInputRef.current.click()}
+                      disabled={uploadingMemberImg}
+                      className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs sm:text-sm font-medium transition flex items-center gap-2"
+                    >
+                      {uploadingMemberImg ? (
+                        <div className="w-3 h-3 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Plus size={14} />
+                      )}
+                      Add Member
+                    </button>
+                  )}
+                  <input
+                    ref={memberInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={e => handleUploadMemberImage(e.target.files[0])}
+                  />
+                </div>
+
+                {loadingMembers ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-8 h-8 border-3 border-rose-200 border-t-rose-500 rounded-full animate-spin" />
+                  </div>
+                ) : memberImages.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    No member images yet. {isOrganizer && 'Click "Add Member" to upload.'}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
+                    <div className="flex gap-4 sm:gap-5" style={{ minWidth: 'max-content' }}>
+                      {memberImages.map((member) => (
+                        <div key={member.id} className="relative group w-24 sm:w-28 flex-shrink-0">
+                          <div className="relative rounded-xl overflow-hidden aspect-square bg-gray-100 shadow-sm">
+                            <img
+                              src={member.image}
+                              alt={member.name || 'Member'}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Member'; }}
+                            />
+                            {isOrganizer && (
+                              <button
+                                onClick={() => handleDeleteMemberImage(member.id)}
+                                className="absolute top-1 right-1 p-1 bg-white/80 rounded-full opacity-0 group-hover:opacity-100 transition hover:bg-red-50"
+                              >
+                                <Trash2 size={12} className="text-red-500" />
+                              </button>
+                            )}
+                          </div>
+                          {member.name && (
+                            <p className="text-xs text-center text-gray-600 mt-1 truncate">{member.name}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-3 text-center">
+                  {isOrganizer ? 'Scroll to see all members. Click + to add more.' : 'Our amazing team members'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ── Helper SVG components ─────────────────────────────────
+// Helper SVG components
 function UsersIcon(props) {
   return (
     <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

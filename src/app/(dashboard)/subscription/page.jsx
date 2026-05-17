@@ -1,514 +1,451 @@
+// src/app/(dashboard)/subscription/page.jsx
 'use client';
-import { useState, useEffect } from 'react';
-import { Crown, Check, Zap, X, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react';
 import SubscriptionService from '@/services/subscription.service';
-import PaymentService from '@/services/payment.service';
-import { formatDate, formatPrice, getErrorMessage } from '@/lib/utils';
+import Link from 'next/link';
+import {
+  Crown, Zap, CheckCircle, XCircle, Calendar,
+  Clock, TrendingUp, Users, Shield, Star,
+  RefreshCw, AlertCircle, Sparkles, ChevronRight
+} from 'lucide-react';
 
-// ── Plan Card ─────────────────────────────────────────────
-function PlanCard({ plan, currentPlan, billingCycle, onSelect, loading }) {
-  const isCurrentPlan = currentPlan?.plan_detail?.name === plan.name;
-  const price = billingCycle === 'monthly' ? plan.price_monthly : plan.price_yearly;
-  const isFree = plan.price_monthly == 0;
-  const isPopular = plan.name === 'pro';
+const PLAN_COLORS = {
+  free:       { gradient: 'from-gray-500 to-gray-700',     light: 'from-gray-50 to-gray-100',     accent: 'text-gray-600',   border: 'border-gray-200' },
+  basic:      { gradient: 'from-blue-500 to-blue-700',     light: 'from-blue-50 to-indigo-50',     accent: 'text-blue-600',   border: 'border-blue-200' },
+  pro:        { gradient: 'from-purple-500 to-purple-700', light: 'from-purple-50 to-pink-50',     accent: 'text-purple-600', border: 'border-purple-200' },
+  enterprise: { gradient: 'from-amber-500 to-orange-600',  light: 'from-amber-50 to-orange-50',    accent: 'text-amber-600',  border: 'border-amber-200' },
+};
 
-  const features = [
-    {
-      label: `${plan.max_events_per_month === -1 ? 'Unlimited' : plan.max_events_per_month} events/month`,
-      included: true
-    },
-    {
-      label: `${plan.max_tickets_per_event === -1 ? 'Unlimited' : plan.max_tickets_per_event} tickets/event`,
-      included: true
-    },
-    {
-      label: `${plan.max_team_members === -1 ? 'Unlimited' : plan.max_team_members} team members`,
-      included: true
-    },
-    { label: 'Custom domain', included: plan.custom_domain },
-    { label: 'Analytics', included: plan.analytics },
-    { label: 'Priority support', included: plan.priority_support },
-  ];
+const STATUS_CONFIG = {
+  active:    { label: 'Active',    color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  expired:   { label: 'Expired',   color: 'bg-red-100 text-red-700 border-red-200' },
+  cancelled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-600 border-gray-200' },
+  trial:     { label: 'Trial',     color: 'bg-blue-100 text-blue-700 border-blue-200' },
+};
 
-  return (
-    <div className={`relative bg-white rounded-2xl border-2 transition-all ${
-      isCurrentPlan
-        ? 'border-[#e94560] shadow-lg shadow-red-100'
-        : isPopular
-        ? 'border-[#1a1a2e] shadow-lg'
-        : 'border-gray-100 shadow-sm hover:border-gray-200'
-    }`}>
-
-      {/* Popular Badge */}
-      {isPopular && !isCurrentPlan && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-[#1a1a2e] text-white text-xs font-bold px-4 py-1 rounded-full">
-            POPULAR
-          </span>
-        </div>
-      )}
-
-      {/* Current Plan Badge */}
-      {isCurrentPlan && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-[#e94560] text-white text-xs font-bold px-4 py-1 rounded-full">
-            CURRENT PLAN
-          </span>
-        </div>
-      )}
-
-      <div className="p-6">
-
-        {/* Plan Name + Icon */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            plan.name === 'enterprise' ? 'bg-yellow-100' :
-            plan.name === 'pro' ? 'bg-[#1a1a2e]' :
-            plan.name === 'basic' ? 'bg-blue-100' : 'bg-gray-100'
-          }`}>
-            <Crown size={18} className={
-              plan.name === 'enterprise' ? 'text-yellow-600' :
-              plan.name === 'pro' ? 'text-white' :
-              plan.name === 'basic' ? 'text-blue-600' : 'text-gray-500'
-            } />
-          </div>
-          <div>
-            <p className="font-bold text-gray-800 capitalize">{plan.display_name}</p>
-            {plan.description && (
-              <p className="text-xs text-gray-400">{plan.description}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Price */}
-        <div className="mb-6">
-          {isFree ? (
-            <p className="text-3xl font-bold text-gray-800">Free</p>
-          ) : (
-            <>
-              <div className="flex items-end gap-1">
-                <span className="text-3xl font-bold text-gray-800">
-                  ₹{parseFloat(price).toLocaleString('en-IN')}
-                </span>
-                <span className="text-gray-400 text-sm mb-1">
-                  /{billingCycle === 'monthly' ? 'mo' : 'yr'}
-                </span>
-              </div>
-              {billingCycle === 'yearly' && plan.yearly_savings > 0 && (
-                <p className="text-xs text-green-600 font-medium mt-1">
-                  💰 ₹{parseFloat(plan.yearly_savings).toLocaleString('en-IN')} bachega yearly
-                </p>
-              )}
-              {billingCycle === 'monthly' && plan.yearly_discount_percent > 0 && (
-                <p className="text-xs text-blue-500 mt-1">
-                  Yearly pe {plan.yearly_discount_percent}% off
-                </p>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Features */}
-        <div className="space-y-2.5 mb-6">
-          {features.map(feature => (
-            <div key={feature.label} className="flex items-center gap-2.5">
-              {feature.included ? (
-                <div className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <Check size={10} className="text-green-600" />
-                </div>
-              ) : (
-                <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  <X size={10} className="text-gray-400" />
-                </div>
-              )}
-              <span className={`text-sm ${feature.included ? 'text-gray-700' : 'text-gray-400'}`}>
-                {feature.label}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* CTA Button */}
-        <button
-          onClick={() => !isCurrentPlan && !isFree && onSelect(plan)}
-          disabled={isCurrentPlan || loading}
-          className={`w-full py-3 rounded-xl font-semibold text-sm transition ${
-            isCurrentPlan
-              ? 'bg-gray-100 text-gray-400 cursor-default'
-              : isFree
-              ? 'bg-gray-100 text-gray-500 cursor-default'
-              : isPopular
-              ? 'bg-[#1a1a2e] text-white hover:bg-[#2a2a4e]'
-              : 'bg-[#e94560] text-white hover:bg-[#d63651]'
-          }`}
-        >
-          {isCurrentPlan ? 'Current Plan' :
-           isFree ? 'Default Plan' :
-           currentPlan ? 'Upgrade' : 'Subscribe'}
-        </button>
-
-      </div>
-    </div>
-  );
-}
-
-// ── Payment Modal ─────────────────────────────────────────
-function PaymentModal({ plan, billingCycle, onClose, onSuccess }) {
-  const [loading, setLoading] = useState(false);
-  const price = billingCycle === 'monthly' ? plan?.price_monthly : plan?.price_yearly;
-
-  const handleRazorpay = async () => {
-    setLoading(true);
-    try {
-      const orderData = await SubscriptionService.createPayment(plan.id, billingCycle);
-
-      PaymentService.openRazorpayCheckout(
-        orderData,
-        async (paymentResponse) => {
-          try {
-            await SubscriptionService.verifyPayment({
-              razorpay_order_id: paymentResponse.razorpay_order_id,
-              razorpay_payment_id: paymentResponse.razorpay_payment_id,
-              razorpay_signature: paymentResponse.razorpay_signature,
-              plan_id: plan.id,
-              billing_cycle: billingCycle,
-            });
-            toast.success(`${plan.display_name} plan activated!`);
-            onSuccess();
-            onClose();
-          } catch (err) {
-            toast.error(getErrorMessage(err));
-          }
-        },
-        (err) => toast.error(err || 'Payment cancelled')
-      );
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setLoading(false);
+const FeatureItem = ({ label, enabled }) => (
+  <div className="flex items-center gap-2.5 py-1.5">
+    {enabled
+      ? <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
+      : <XCircle    size={14} className="text-gray-300 flex-shrink-0" />
     }
-  };
+    <span className={`text-sm ${enabled ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
+  </div>
+);
 
-  if (!plan) return null;
+const UsageBar = ({ label, used, limit, unlimited }) => {
+  const percent = unlimited || limit === -1 ? 0 : limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
+  const isHigh  = percent >= 80;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-5">
-
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-gray-800 text-lg">Subscription Confirm</h3>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100">
-            <X size={18} className="text-gray-500" />
-          </button>
-        </div>
-
-        {/* Plan Summary */}
-        <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold text-gray-800">{plan.display_name} Plan</p>
-            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full font-medium capitalize">
-              {billingCycle}
-            </span>
-          </div>
-          <div className="flex items-center justify-between border-t border-gray-200 pt-3">
-            <span className="text-sm text-gray-500">Total Amount</span>
-            <span className="text-xl font-bold text-gray-800">
-              ₹{parseFloat(price).toLocaleString('en-IN')}
-            </span>
-          </div>
-        </div>
-
-        {/* Razorpay Button */}
-        <button
-          onClick={handleRazorpay}
-          disabled={loading}
-          className="w-full bg-[#e94560] text-white py-3.5 rounded-xl font-bold text-sm hover:bg-[#d63651] transition disabled:opacity-60 flex items-center justify-center gap-2"
-        >
-          {loading
-            ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            : <><Zap size={16} /> Pay with Razorpay</>
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm font-medium text-gray-700">{label}</span>
+        <span className="text-xs text-gray-500">
+          {unlimited || limit === -1
+            ? <span className="text-emerald-600 font-semibold">Unlimited</span>
+            : `${used} / ${limit}`
           }
-        </button>
-
-        <p className="text-center text-xs text-gray-400">
-          Secure payment powered by Razorpay
-        </p>
-
+        </span>
       </div>
+      {!unlimited && limit !== -1 && (
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${isHigh ? 'bg-rose-500' : 'bg-emerald-500'}`}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
+      {(unlimited || limit === -1) && (
+        <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
+          <div className="h-full w-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full animate-pulse" />
+        </div>
+      )}
     </div>
   );
-}
+};
 
-// ── Main Page ─────────────────────────────────────────────
 export default function SubscriptionPage() {
-  const [plans, setPlans] = useState([]);
-  const [currentSub, setCurrentSub] = useState(null);
-  const [usage, setUsage] = useState(null);
-  const [billingCycle, setBillingCycle] = useState('monthly');
-  const [loading, setLoading] = useState(true);
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [subscription, setSubscription] = useState(null);
+  const [usage,        setUsage]        = useState(null);
+  const [plans,        setPlans]        = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [activeTab,    setActiveTab]    = useState('current'); // 'current' | 'plans'
+  const [billingTab, setBillingTab] = useState('monthly');
 
   const fetchData = async () => {
-    setLoading(true);
     try {
-      const [plansRes, subRes, usageRes] = await Promise.all([
+      setLoading(true);
+      const [plansData] = await Promise.all([
         SubscriptionService.getPlans(),
-        SubscriptionService.getMySubscription().catch(() => null),
-        SubscriptionService.getUsage().catch(() => null),
       ]);
-      setPlans(plansRes.results || plansRes || []);
-      setCurrentSub(subRes?.subscription || null);
-      setUsage(usageRes || null);
+      setPlans(Array.isArray(plansData) ? plansData : []);
+
+      try {
+        const [subData, usageData] = await Promise.all([
+          SubscriptionService.getMySubscription(),
+          SubscriptionService.getUsage(),
+        ]);
+        setSubscription(subData);
+        setUsage(usageData);
+      } catch {
+        setSubscription(null);
+        setUsage(null);
+      }
     } catch (err) {
-      toast.error(getErrorMessage(err));
+      console.error('Fetch error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    // Razorpay script load karo
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-    fetchData();
-    return () => document.body.removeChild(script);
-  }, []);
-
-  const handleCancel = async () => {
-    if (!confirm('Subscription cancel karna chahte ho? Current period tak access rahega.')) return;
-    setCancelling(true);
-    try {
-      await SubscriptionService.cancelSubscription();
-      toast.success('Subscription cancelled.');
-      fetchData();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setCancelling(false);
-    }
-  };
+  useEffect(() => { fetchData(); }, []);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-[#e94560] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-[70vh]">
+        <div className="relative">
+          <div className="w-12 h-12 border-4 border-amber-100 border-t-amber-500 rounded-full animate-spin" />
+          <Sparkles size={14} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-amber-500" />
+        </div>
       </div>
     );
   }
 
+  const currentPlan   = subscription?.plan_detail;
+  const planColors    = currentPlan ? (PLAN_COLORS[currentPlan.name] || PLAN_COLORS.free) : null;
+  const statusConfig  = subscription ? (STATUS_CONFIG[subscription.subscription_status] || STATUS_CONFIG.active) : null;
+
+  // Group plans by type for display
+  const monthlyPlans = plans.filter(p => p.billing_cycle === 'monthly');
+  const yearlyPlans  = plans.filter(p => p.billing_cycle === 'yearly');
+  const displayPlans = billingTab === 'monthly' ? monthlyPlans : yearlyPlans;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 max-w-5xl mx-auto">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Subscription</h1>
-        <p className="text-gray-500 text-sm mt-1">Plan upgrade karo — more events, more features</p>
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Subscription</h1>
+          <p className="text-gray-500 text-xs mt-0.5">Apna plan manage karo</p>
+        </div>
+        <button onClick={fetchData}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-medium transition">
+          <RefreshCw size={12} />
+          Refresh
+        </button>
       </div>
 
-      {/* Current Subscription Card */}
-      {currentSub && (
-        <div className={`rounded-2xl p-6 ${
-          currentSub.plan_detail?.name === 'free'
-            ? 'bg-gray-50 border border-gray-200'
-            : 'bg-gradient-to-r from-[#1a1a2e] to-[#e94560]'
-        }`}>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Crown size={18} className={currentSub.plan_detail?.name === 'free' ? 'text-gray-500' : 'text-yellow-300'} />
-                <p className={`font-bold text-lg ${currentSub.plan_detail?.name === 'free' ? 'text-gray-800' : 'text-white'}`}>
-                  {currentSub.plan_detail?.display_name} Plan
-                </p>
-              </div>
-              <p className={`text-sm ${currentSub.plan_detail?.name === 'free' ? 'text-gray-500' : 'text-white/70'}`}>
-                {currentSub.is_active ? (
-                  <>Active · {currentSub.days_remaining} days remaining</>
-                ) : 'Expired'}
-              </p>
-            </div>
-
-            {/* Cancel Button */}
-            {currentSub.plan_detail?.name !== 'free' && currentSub.status !== 'cancelled' && (
-              <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                className="text-xs text-white/70 hover:text-white border border-white/30 px-3 py-1.5 rounded-lg transition"
-              >
-                {cancelling ? 'Cancelling...' : 'Cancel'}
-              </button>
-            )}
-          </div>
-
-          {/* Usage Stats */}
-          {usage && (
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              {[
-                {
-                  label: 'Events',
-                  used: usage.usage?.events?.used,
-                  limit: usage.usage?.events?.limit,
-                  remaining: usage.usage?.events?.remaining,
-                },
-              ].map(stat => (
-                <div key={stat.label} className={`rounded-xl p-3 ${currentSub.plan_detail?.name === 'free' ? 'bg-white' : 'bg-white/10'}`}>
-                  <p className={`text-xs mb-1 ${currentSub.plan_detail?.name === 'free' ? 'text-gray-400' : 'text-white/60'}`}>
-                    {stat.label} This Month
-                  </p>
-                  <p className={`font-bold ${currentSub.plan_detail?.name === 'free' ? 'text-gray-800' : 'text-white'}`}>
-                    {stat.used}
-                    <span className={`text-xs font-normal ml-1 ${currentSub.plan_detail?.name === 'free' ? 'text-gray-400' : 'text-white/60'}`}>
-                      / {stat.limit === -1 ? '∞' : stat.limit}
-                    </span>
-                  </p>
-                </div>
-              ))}
-
-              <div className={`rounded-xl p-3 ${currentSub.plan_detail?.name === 'free' ? 'bg-white' : 'bg-white/10'}`}>
-                <p className={`text-xs mb-1 ${currentSub.plan_detail?.name === 'free' ? 'text-gray-400' : 'text-white/60'}`}>
-                  Tickets/Event
-                </p>
-                <p className={`font-bold ${currentSub.plan_detail?.name === 'free' ? 'text-gray-800' : 'text-white'}`}>
-                  {usage.usage?.tickets_per_event?.limit === 'unlimited' ? '∞' : usage.usage?.tickets_per_event?.limit}
-                </p>
-              </div>
-
-              <div className={`rounded-xl p-3 ${currentSub.plan_detail?.name === 'free' ? 'bg-white' : 'bg-white/10'}`}>
-                <p className={`text-xs mb-1 ${currentSub.plan_detail?.name === 'free' ? 'text-gray-400' : 'text-white/60'}`}>
-                  Team Members
-                </p>
-                <p className={`font-bold ${currentSub.plan_detail?.name === 'free' ? 'text-gray-800' : 'text-white'}`}>
-                  {usage.usage?.team_members?.limit === 'unlimited' ? '∞' : usage.usage?.team_members?.limit}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Cancelled Warning */}
-          {currentSub.status === 'cancelled' && (
-            <div className="mt-4 flex items-center gap-2 bg-yellow-100 text-yellow-700 px-4 py-2 rounded-xl text-sm">
-              <AlertCircle size={14} />
-              Subscription cancelled — {formatDate(currentSub.current_period_end)} tak access rahega
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Billing Toggle */}
-      <div className="flex items-center justify-center">
-        <div className="bg-gray-100 p-1 rounded-xl flex items-center gap-1">
-          <button
-            onClick={() => setBillingCycle('monthly')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition ${
-              billingCycle === 'monthly'
-                ? 'bg-white text-gray-800 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Monthly
+      {/* ── Tabs ── */}
+      <div className="flex bg-gray-100 rounded-xl p-1 max-w-xs">
+        {[
+          { key: 'current', label: 'Current Plan' },
+          { key: 'plans',   label: 'All Plans' },
+        ].map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition
+              ${activeTab === tab.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            {tab.label}
           </button>
-          <button
-            onClick={() => setBillingCycle('yearly')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
-              billingCycle === 'yearly'
-                ? 'bg-white text-gray-800 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Yearly
-            <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold">
-              20% OFF
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Plans Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {plans.map(plan => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            currentPlan={currentSub}
-            billingCycle={billingCycle}
-            onSelect={setSelectedPlan}
-            loading={loading}
-          />
         ))}
       </div>
 
-      {/* Features Comparison */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h3 className="font-bold text-gray-800">Full Comparison</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-gray-700">Feature</th>
-                {plans.map(plan => (
-                  <th key={plan.id} className="text-center px-4 py-4 text-sm font-semibold text-gray-700 capitalize">
-                    {plan.display_name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {[
-                {
-                  label: 'Events/month',
-                  getValue: p => p.max_events_per_month === -1 ? '∞' : p.max_events_per_month
-                },
-                {
-                  label: 'Tickets/event',
-                  getValue: p => p.max_tickets_per_event === -1 ? '∞' : p.max_tickets_per_event
-                },
-                {
-                  label: 'Team members',
-                  getValue: p => p.max_team_members === -1 ? '∞' : p.max_team_members
-                },
-                {
-                  label: 'Custom domain',
-                  getValue: p => p.custom_domain ? '✅' : '❌'
-                },
-                {
-                  label: 'Analytics',
-                  getValue: p => p.analytics ? '✅' : '❌'
-                },
-                {
-                  label: 'Priority support',
-                  getValue: p => p.priority_support ? '✅' : '❌'
-                },
-              ].map(row => (
-                <tr key={row.label} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-600">{row.label}</td>
-                  {plans.map(plan => (
-                    <td key={plan.id} className="px-4 py-4 text-center text-sm font-medium text-gray-700">
-                      {row.getValue(plan)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* ══════════════════════════════════════════
+          TAB 1: Current Plan
+      ══════════════════════════════════════════ */}
+      {activeTab === 'current' && (
+        <div className="space-y-5">
+          {subscription && currentPlan ? (
+            <>
+              {/* Current Plan Hero */}
+              <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${planColors.gradient} p-6 text-white shadow-xl`}>
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-black/10 rounded-full blur-2xl" />
 
-      {/* Payment Modal */}
-      {selectedPlan && (
-        <PaymentModal
-          plan={selectedPlan}
-          billingCycle={billingCycle}
-          onClose={() => setSelectedPlan(null)}
-          onSuccess={fetchData}
-        />
+                <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Crown size={16} className="text-yellow-300" />
+                      <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">
+                        Current Plan
+                      </span>
+                    </div>
+                    <h2 className="text-2xl font-black">{currentPlan.display_name}</h2>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${statusConfig.color}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                        {statusConfig.label}
+                      </span>
+                      {subscription.days_remaining != null && (
+                        <span className="text-white/70 text-xs flex items-center gap-1">
+                          <Clock size={11} />
+                          {subscription.days_remaining} days remaining
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-4xl font-black">
+                      {currentPlan.price == 0 ? 'Free' : `₹${Number(currentPlan.price).toLocaleString()}`}
+                    </p>
+                    {currentPlan.price > 0 && (
+                      <p className="text-white/60 text-sm">per {currentPlan.billing_cycle === 'monthly' ? 'month' : 'year'}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Date info */}
+                <div className="relative mt-5 pt-4 border-t border-white/20 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <p className="text-[10px] text-white/60 uppercase tracking-wider">Start Date</p>
+                    <p className="text-sm font-semibold mt-0.5">
+                      {subscription.start_date
+                        ? new Date(subscription.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-white/60 uppercase tracking-wider">End Date</p>
+                    <p className="text-sm font-semibold mt-0.5">
+                      {subscription.end_date
+                        ? new Date(subscription.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : 'No expiry'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-white/60 uppercase tracking-wider">Billing</p>
+                    <p className="text-sm font-semibold capitalize mt-0.5">{currentPlan.billing_cycle}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Usage + Features Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Usage */}
+                {usage && (
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <TrendingUp size={16} className="text-rose-500" />
+                      <h3 className="font-bold text-gray-900">Usage</h3>
+                    </div>
+                    <div className="space-y-4">
+                      <UsageBar
+                        label="Active Events"
+                        used={usage.usage?.events?.used || 0}
+                        limit={usage.usage?.events?.limit}
+                        unlimited={usage.usage?.events?.unlimited}
+                      />
+                      <UsageBar
+                        label="Attendees per Event"
+                        used={0}
+                        limit={usage.usage?.attendees_per_event?.limit}
+                        unlimited={usage.usage?.attendees_per_event?.unlimited}
+                      />
+                      <UsageBar
+                        label="Team Members"
+                        used={0}
+                        limit={usage.usage?.team_members?.limit}
+                        unlimited={usage.usage?.team_members?.unlimited}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Features */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield size={16} className="text-purple-500" />
+                    <h3 className="font-bold text-gray-900">Features</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                    {[
+                      { label: 'Custom Branding',     key: 'custom_branding' },
+                      { label: 'White Label',          key: 'white_label' },
+                      { label: 'Custom Domain',        key: 'custom_domain' },
+                      { label: 'Discount Coupons',     key: 'discount_coupons' },
+                      { label: 'QR Check-in',          key: 'qr_checkin' },
+                      { label: 'Email Automation',     key: 'email_automation' },
+                      { label: 'Payment Gateway',      key: 'payment_gateway' },
+                      { label: 'Basic Analytics',      key: 'basic_analytics' },
+                      { label: 'Advanced Analytics',   key: 'advanced_analytics' },
+                      { label: 'Export Reports',       key: 'export_reports' },
+                      { label: 'Full API Access',      key: 'full_api_access' },
+                      { label: 'Priority Support',     key: 'priority_support' },
+                    ].map(f => (
+                      <FeatureItem
+                        key={f.key}
+                        label={f.label}
+                        enabled={usage?.features?.[f.key] ?? currentPlan?.[f.key] ?? false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Upgrade CTA */}
+              {currentPlan.name !== 'enterprise' && (
+                <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-100 rounded-2xl p-5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center">
+                      <Zap size={18} className="text-rose-500" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-sm">Unlock more features</p>
+                      <p className="text-gray-500 text-xs mt-0.5">Upgrade your plan to get advanced features</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setActiveTab('plans')}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-rose-500 text-white rounded-xl text-sm font-semibold hover:bg-rose-600 transition shadow-md shadow-rose-500/25">
+                    View Plans <ChevronRight size={14} />
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            // No subscription
+            <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+              <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Crown size={28} className="text-amber-400" />
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">No Active Plan</h3>
+              <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+                Abhi koi plan active nahi hai. Neeche se plan select karo ya admin se contact karo.
+              </p>
+              <button onClick={() => setActiveTab('plans')}
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition">
+                <Crown size={15} /> View Plans
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
+      {/* ══════════════════════════════════════════
+          TAB 2: All Plans
+      ══════════════════════════════════════════ */}
+      {activeTab === 'plans' && (
+        <div className="space-y-5">
+          {/* Billing Toggle */}
+          <div className="flex bg-gray-100 rounded-xl p-1 max-w-xs mx-auto">
+            {['monthly', 'yearly'].map(cycle => (
+              <button key={cycle} onClick={() => setBillingTab(cycle)}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold capitalize transition
+                  ${billingTab === cycle ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                {cycle}
+                {cycle === 'yearly' && (
+                  <span className="ml-1.5 text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full font-bold">
+                    Save 20%
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Plans Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {displayPlans.map(plan => {
+              const colors    = PLAN_COLORS[plan.name] || PLAN_COLORS.free;
+              const isCurrent = currentPlan?.id === plan.id;
+
+              return (
+                <div key={plan.id}
+                  className={`relative bg-white rounded-2xl border-2 overflow-hidden transition-all duration-300 hover:shadow-lg
+                    ${isCurrent ? 'border-emerald-400 shadow-emerald-100 shadow-lg' : plan.is_popular ? 'border-purple-300' : 'border-gray-100'}`}>
+
+                  {isCurrent && (
+                    <div className="absolute top-0 left-0 right-0 bg-emerald-500 text-white text-[10px] font-bold text-center py-1 tracking-wider uppercase">
+                      ✓ Current Plan
+                    </div>
+                  )}
+                  {plan.is_popular && !isCurrent && (
+                    <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[10px] font-bold text-center py-1 tracking-wider uppercase flex items-center justify-center gap-1">
+                      <Star size={9} fill="white" /> Most Popular
+                    </div>
+                  )}
+
+                  <div className={`h-1.5 bg-gradient-to-r ${colors.gradient} ${(isCurrent || plan.is_popular) ? 'mt-6' : ''}`} />
+
+                  <div className="p-5">
+                    {/* Plan Name */}
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center mb-3 shadow-md`}>
+                      <Crown size={18} className="text-white" />
+                    </div>
+                    <p className="font-black text-gray-900 text-lg">{plan.display_name}</p>
+                    <p className="text-2xl font-black text-gray-900 mt-2">
+                      {plan.price == 0 ? 'Free' : `₹${Number(plan.price).toLocaleString()}`}
+                    </p>
+                    {plan.price > 0 && (
+                      <p className="text-xs text-gray-400">per {plan.billing_cycle === 'monthly' ? 'month' : 'year'}</p>
+                    )}
+
+                    {plan.description && (
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed">{plan.description}</p>
+                    )}
+
+                    {/* Key limits */}
+                    <div className="mt-4 space-y-2 pb-4 border-b border-gray-50">
+                      {[
+                        { label: plan.max_events === -1 ? 'Unlimited events' : `${plan.max_events} events` },
+                        { label: plan.max_attendees_event === -1 ? 'Unlimited attendees' : `${plan.max_attendees_event} attendees/event` },
+                        { label: plan.max_team_members === -1 ? 'Unlimited team' : plan.max_team_members === 0 ? 'No team members' : `${plan.max_team_members} team members` },
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                          <CheckCircle size={11} className="text-emerald-500 flex-shrink-0" />
+                          {item.label}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Feature highlights */}
+                    <div className="mt-3 space-y-1.5">
+                      {[
+                        plan.custom_branding     && 'Custom Branding',
+                        plan.payment_gateway     && 'Payment Gateway',
+                        plan.advanced_analytics  && 'Advanced Analytics',
+                        plan.white_label         && 'White Label',
+                        plan.full_api_access     && 'Full API Access',
+                        plan.priority_support    && 'Priority Support',
+                      ].filter(Boolean).slice(0, 4).map((feature, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                          <CheckCircle size={11} className="text-emerald-500 flex-shrink-0" />
+                          {feature}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* CTA */}
+                    <div className="mt-5">
+                      {isCurrent ? (
+                        <div className="w-full py-2.5 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-semibold text-center border border-emerald-200">
+                          ✓ Active Plan
+                        </div>
+                      ) : (
+                        <div className="w-full py-2.5 rounded-xl bg-gray-50 text-gray-500 text-sm font-medium text-center border border-gray-200 flex items-center justify-center gap-1">
+                          <AlertCircle size={13} />
+                          Contact Admin to Upgrade
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Contact note */}
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start gap-3">
+            <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-amber-800 text-sm font-semibold">Plan upgrade ke liye admin se contact karo</p>
+              <p className="text-amber-600 text-xs mt-0.5">
+                Plan change karne ke liye apne system administrator ko request bhejo.
+                Woh aapke account pe plan assign kar denge.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
